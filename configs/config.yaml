@@ -18,4 +18,4 @@ training:
 
 model:
   name: "LCAnet" # options: AODnet, LCAnet
-  save_path: "./checkpoints"
+  save_path: "./runs"

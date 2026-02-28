@@ -4,26 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="00522e64-b211-41a1-b53f-89b58b07b833" name="Changes" comment="Run different Configs and log training metrics">
-      <change afterPath="$PROJECT_DIR$/code/evaluation/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/code/evaluation/evaluation.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/code/models/ffa_net.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/code/utils.py" afterDir="false" />
+    <list default="true" id="00522e64-b211-41a1-b53f-89b58b07b833" name="Changes" comment="Add FFANet and Time Benchmark">
+      <change afterPath="$PROJECT_DIR$/pretrained_models/ots_train_ffa_3_19.pk" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/LCANet/dataloader.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/LCANet/lca_net.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/LCANet/lcanet.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/LCANet/test.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/LCANet/time_test.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/LCANet/train.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/dataloaders.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/dataloaders.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/runs.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/code/runs.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/ssim_psnr_eval.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/evaluation/ssim_psnr_eval.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/time_eval.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/evaluation/time_eval.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/train.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/train.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/configs/config.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/configs/config.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/models/aodnet.pth" beforeDir="false" afterPath="$PROJECT_DIR$/pretrained_models/aodnet.pth" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/models/aodnetX.pt" beforeDir="false" afterPath="$PROJECT_DIR$/pretrained_models/aodnetX.pt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -260,7 +245,7 @@
       <workItem from="1771824021917" duration="5652000" />
       <workItem from="1771845638120" duration="408000" />
       <workItem from="1771980215719" duration="9494000" />
-      <workItem from="1772231049651" duration="19486000" />
+      <workItem from="1772231049651" duration="19871000" />
     </task>
     <task id="LOCAL-00001" summary="Git init">
       <option name="closed" value="true" />
@@ -286,7 +271,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772239611162</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Add FFANet and Time Benchmark">
+      <option name="closed" value="true" />
+      <created>1772252630400</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1772252630400</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -318,7 +311,8 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Git init" />
     <MESSAGE value="Run different Configs and log training metrics" />
-    <option name="LAST_COMMIT_MESSAGE" value="Run different Configs and log training metrics" />
+    <MESSAGE value="Add FFANet and Time Benchmark" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add FFANet and Time Benchmark" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
