@@ -1,12 +1,15 @@
 import os
+import sys
 import time
 from datetime import datetime
 import json, csv
+import platform
 
 import torch
 from omegaconf import OmegaConf
 from torchvision import utils
 import numpy as np
+from tqdm import tqdm
 
 from evaluation.ssim_psnr_eval import ssim, psnr
 from evaluation.jetson_benchmark import TegrastatsMonitor
@@ -94,7 +97,7 @@ def run_benchmark(cfg, model):
     for _ in range(cfg.benchmark.warmup):
         with torch.no_grad():
             if cfg.benchmark.use_fp16:
-                with torch.cuda.amp.autocast():
+                with torch.amp.autocast(cfg.benchmark.device):
                     model(dummy)
             else:
                 model(dummy)
@@ -106,7 +109,7 @@ def run_benchmark(cfg, model):
     if monitor:
         monitor.start()
 
-    for _ in range(cfg.benchmark.runs):
+    for _ in tqdm(range(cfg.benchmark.runs)):
         start = time.time()
 
         with torch.no_grad():
@@ -143,6 +146,13 @@ def run_benchmark(cfg, model):
         if monitor.ram_usage:
             metrics["avg_ram_usage_mb"] = float(np.mean(monitor.ram_usage))
 
+    system_info = {
+        "platform": platform.platform(),
+        "cuda_available": torch.cuda.is_available(),
+        "cuda_device": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu",
+    }
+    metrics["system_info"] = system_info
+
     # Save JSON
     with open(os.path.join(run_dir, "metrics.json"), "w") as f:
         json.dump(metrics, f, indent=4)
@@ -153,6 +163,14 @@ def run_benchmark(cfg, model):
         writer = csv.writer(f)
         writer.writerow(metrics.keys())
         writer.writerow(metrics.values())
+
+    env = {
+        "python_version": sys.version,
+        "torch_version": torch.__version__,
+        "cuda_version": torch.version.cuda,
+    }
+    with open(os.path.join(run_dir, "environment.json"), "w") as f:
+        json.dump(env, f, indent=4)
 
     print("\n===== Benchmark Finished =====")
     for k, v in metrics.items():
