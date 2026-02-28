@@ -4,11 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="00522e64-b211-41a1-b53f-89b58b07b833" name="Changes" comment="Add FFANet and Time Benchmark">
-      <change afterPath="$PROJECT_DIR$/pretrained_models/ots_train_ffa_3_19.pk" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+    <list default="true" id="00522e64-b211-41a1-b53f-89b58b07b833" name="Changes" comment="Add FFA Model">
+      <change afterPath="$PROJECT_DIR$/code/evaluation/jetson_benchmark.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/configs/inference_config.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/configs/config.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/configs/config.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/evaluation/evaluation.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/evaluation/evaluation.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/evaluation/time_eval.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/evaluation/time_eval.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -245,7 +246,7 @@
       <workItem from="1771824021917" duration="5652000" />
       <workItem from="1771845638120" duration="408000" />
       <workItem from="1771980215719" duration="9494000" />
-      <workItem from="1772231049651" duration="19871000" />
+      <workItem from="1772231049651" duration="21018000" />
     </task>
     <task id="LOCAL-00001" summary="Git init">
       <option name="closed" value="true" />
@@ -279,7 +280,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772252630400</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="Add FFA Model">
+      <option name="closed" value="true" />
+      <created>1772252755931</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1772252755931</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -312,7 +321,8 @@
     <MESSAGE value="Git init" />
     <MESSAGE value="Run different Configs and log training metrics" />
     <MESSAGE value="Add FFANet and Time Benchmark" />
-    <option name="LAST_COMMIT_MESSAGE" value="Add FFANet and Time Benchmark" />
+    <MESSAGE value="Add FFA Model" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add FFA Model" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

@@ -94,3 +94,46 @@ def benchmark_dataloader(
     print(f"FPS: {fps:.2f}")
 
     return avg_ms, fps
+
+def benchmark_gpu(
+    model,
+    device,
+    input_size=(1, 3, 256, 256),
+    runs=100,
+    use_fp16=True
+):
+    model = model.to(device)
+    model.eval()
+
+    dummy = torch.randn(input_size).to(device)
+
+    # Warmup
+    for _ in range(10):
+        with torch.no_grad():
+            if use_fp16:
+                with torch.cuda.amp.autocast():
+                    model(dummy)
+            else:
+                model(dummy)
+
+    torch.cuda.synchronize()
+    start = time.time()
+
+    for _ in range(runs):
+        with torch.no_grad():
+            if use_fp16:
+                with torch.cuda.amp.autocast():
+                    model(dummy)
+            else:
+                model(dummy)
+
+    torch.cuda.synchronize()
+    end = time.time()
+
+    avg_time = (end - start) / runs
+    fps = 1.0 / avg_time
+
+    print("---- Benchmark ----")
+    print(f"FP16 enabled: {use_fp16}")
+    print(f"Avg inference time: {avg_time * 1000:.2f} ms")
+    print(f"FPS: {fps:.2f}")

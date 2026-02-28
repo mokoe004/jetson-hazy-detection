@@ -1,0 +1,19 @@
+# inference_config.yaml
+benchmark:
+  name: ffa_jetson_test
+
+  device: cuda
+  use_fp16: true
+
+  input_size: [1, 3, 256, 256]
+  runs: 200
+  warmup: 20
+
+  save_path: runs/benchmark
+
+  jetson:
+    enable_tegrastats: true
+
+model:
+  name: "LCAnet" # options: AODnet, LCAnet, FFANet
+  save_path: "./runs"
