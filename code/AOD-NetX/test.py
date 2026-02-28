@@ -5,7 +5,7 @@ import torch.optim as optim
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from dataloader import DehazingDataset
-from aodnet import DehazeNetAttention
+from aodnetX import DehazeNetAttention
 from utils import ssim, calculate_psnr
 import numpy as np
 from torchvision.utils import save_image
@@ -16,11 +16,12 @@ def collate_fn(batch):
     batch_mod['foggy_image'] = torch.stack(batch_mod['foggy_image'])
     return batch_mod
 
-clear_dir = 'path_to_clear_images_directory'
-foggy_dir = 'path_to_foggy_images_directory'
-bb_dir = 'path_to_bounding_boxes_directory'
 
-save_dir = 'path_to_save_directory'
+clear_dir = '../../datasets/hazy-no-bb/GT'
+foggy_dir = '../../datasets/hazy-no-bb/hazy'
+bb_dir = '../../datasets/hazy-no-bb/bb'
+
+save_dir = './runs'
 os.makedirs(save_dir, exist_ok=True) 
 
 transform = transforms.Compose([
@@ -28,12 +29,12 @@ transform = transforms.Compose([
     transforms.ToTensor()
 ])
 
-test_dataset = DehazingDataset(clear_dir, foggy_dir, bb_dir, 'test', transform=transform)
+test_dataset = DehazingDataset(clear_dir, foggy_dir, bb_dir, 'val', transform=transform)
 test_loader = DataLoader(test_dataset, batch_size=4, shuffle=True, num_workers=4, collate_fn=collate_fn)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 try:
-    model = torch.load('/path/aodnetX.pt').to(device)
+    model = torch.load('./aodnetX.pt').to(device)
     model.eval()
 except Exception as e:
     print(f"Error loading model: {e}")

@@ -3,7 +3,7 @@
 # =========================================================
 
 # Base image with CUDA, TensorRT, PyTorch etc.
-FROM nvcr.io/nvidia/l4t-ml:r35.4.1-py3
+FROM nvcr.io/nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
 
 WORKDIR /workspace
 

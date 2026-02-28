@@ -7,6 +7,7 @@ from dataloader import DehazingDataset
 from aodnetX import DehazeNetAttention
 
 from torch.utils.data.dataloader import default_collate
+from tqdm import tqdm
 
 def collate_fn(batch):
     """ Custom collate function to handle batches with variable-sized bounding boxes. """
@@ -63,9 +64,9 @@ def main():
     print(f"Using {device} device")
 
     # Dataset paths and transformation
-    clear_dir = 'path_to_clear_images_directory'
-    foggy_dir = 'path_to_foggy_images_directory'
-    bb_dir = 'path_to_bounding_boxes_directory'
+    clear_dir = '../../datasets/hazy-no-bb/GT'
+    foggy_dir = '../../datasets/hazy-no-bb/hazy'
+    bb_dir = '../../datasets/hazy-no-bb/bb'
     transform = transforms.Compose([
         transforms.Resize((640, 640)),
         transforms.ToTensor()
@@ -88,14 +89,14 @@ def main():
 
     # Training loop
     num_epochs = 10
-    for epoch in range(num_epochs):
+    for epoch in tqdm(range(num_epochs)):
         train_loss = train_one_epoch(model, train_loader, loss_fn, optimizer, device)
         val_loss = validate(model, val_loader, loss_fn, device)
         print(f"Epoch {epoch+1}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
 
         scheduler.step()
 
-    torch.save(model, '/path/aodnetX.pt')
+    torch.save(model, './aodnetX.pt')
 
 if __name__ == "__main__":
     main()

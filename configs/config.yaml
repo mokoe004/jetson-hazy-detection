@@ -1,0 +1,18 @@
+# config.yaml
+dataset:
+  name: "Paired_Hazy"
+  root: "./datasets/hazy-no-bb" # options: /RTTS/RTTS
+  img_size: 256
+  return_bboxes: False
+
+training:
+  device: "cuda"
+  batch_size: 2
+  lr: 0.0001
+  weight_decay: 0.0
+  epochs: 20
+  num_workers: 0
+
+model:
+  name: "LCAnet" # options: AODnet, LCAnet
+  save_path: "./checkpoints"

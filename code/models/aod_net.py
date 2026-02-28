@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 
-class aodnet(nn.Module):
+class AODnet(nn.Module):
     def __init__(self):
-        super(aodnet, self).__init__()
+        super(AODnet, self).__init__()
 
         self.relu = nn.ReLU(inplace=True)
         self.e_conv1 = nn.Conv2d(in_channels=3, out_channels=3, kernel_size=1, stride=1, padding=0, bias=True)
