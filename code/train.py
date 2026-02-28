@@ -4,15 +4,18 @@ import csv
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Subset
 from torchvision import transforms, utils
 from tqdm import tqdm
 
-from LCANet.lcanet import LCAnet
+from models.lca_net import LCANet
 from models.aod_net import AODnet
-from dataloaders import PairedDataset
-from ssim_psnr_eval import ssim, psnr
+from dataloaders import ResideOTS
+from evaluation.evaluation import calculate_psnr_ssim
 from omegaconf import OmegaConf
+
+from utils import print_model_info
+
 
 def train(cfg):
     # --------------------------------------------------
@@ -43,10 +46,11 @@ def train(cfg):
     if cfg.model.name == "AODnet":
         model = AODnet().to(device)
     elif cfg.model.name == "LCAnet":
-        model = LCAnet().to(device)
+        model = LCANet().to(device)
     else:
         print("Model not known. Fallback to AODNet")
         model = AODnet().to(device)
+    print_model_info(model)
 
     def weights_init(m):
         if isinstance(m, nn.Conv2d):
@@ -63,6 +67,16 @@ def train(cfg):
         weight_decay=cfg.training.weight_decay
     )
 
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode="max",  # PSNR soll steigen
+        factor=0.5,  # LR halbieren
+        patience=5,  # 5 Epochen ohne Verbesserung
+        threshold=0.01,  # min. 0.01 dB Verbesserung
+        cooldown=0,
+        min_lr=1e-6,
+    )
+
     # --------------------------------------------------
     # 4) Dataset + Dataloaders
     # --------------------------------------------------
@@ -71,13 +85,15 @@ def train(cfg):
         transforms.ToTensor(),
     ])
 
-    full_dataset = PairedDataset(cfg, transforms=transform)
+    dataset = ResideOTS(cfg, transforms=transform)
+    if cfg.dataset.subset:
+        dataset = Subset(dataset, range(cfg.dataset.subset))
 
     # Train val split 0.8 - 0.2
-    val_size = int(0.2 * len(full_dataset))
-    train_size = len(full_dataset) - val_size
+    val_size = int(0.2 * len(dataset))
+    train_size = len(dataset) - val_size
     torch.manual_seed(42)
-    train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
     train_loader = DataLoader(
         train_dataset,
@@ -138,26 +154,16 @@ def train(cfg):
 
         avg_train_loss = train_loss / max(1, len(train_loader))
 
-        # -------- VALIDATION --------
-        model.eval()
-        total_psnr = 0.0
-        total_ssim = 0.0
+        avg_psnr, avg_ssim = calculate_psnr_ssim(
+            model,
+            val_loader,
+            device=device,
+            out_dir=out_dir,
+            save_example=True,
+            filename_prefix=f"train_epoch{epoch:03d}"
+            )
 
-        with torch.no_grad():
-            for i, (hazy, clear) in enumerate(val_loader):
-                hazy, clear = hazy.to(device, non_blocking=True), clear.to(device, non_blocking=True)
-                prediction = model(hazy)
-
-                total_psnr += psnr(prediction, clear)
-                total_ssim += ssim(prediction, clear).item()
-
-                # Beispielbild speichern (erste Val-Batch)
-                if i == 0:
-                    comparison = torch.cat([hazy[:1], prediction[:1], clear[:1]], dim=3)
-                    utils.save_image(comparison, os.path.join(out_dir, f"epoch_{epoch+1:04d}.png"))
-
-        avg_psnr = total_psnr / max(1, len(val_loader))
-        avg_ssim = total_ssim / max(1, len(val_loader))
+        scheduler.step(avg_psnr)
 
         # -------- Save LAST every epoch --------
         torch.save(model.state_dict(), last_path)
@@ -168,7 +174,7 @@ def train(cfg):
             torch.save(model.state_dict(), best_path)
 
         # -------- CSV write --------
-        lr = optimizer.param_groups[0]["lr"]
+        lr = scheduler.optimizer.param_groups[0]["lr"]
         epoch_time = time.time() - t0
 
         with open(csv_path, mode="a", newline="", encoding="utf-8") as f:

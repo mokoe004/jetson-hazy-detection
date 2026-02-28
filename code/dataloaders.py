@@ -122,3 +122,45 @@ class PairedDataset(Dataset):
             clear_img = self.transforms(clear_img)
 
         return hazy_img, clear_img
+
+class ResideOTS(Dataset):
+    def __init__(self, cfg, transforms=None):
+        self.cfg = cfg
+        self.hazy_imgs_dir = os.path.join(cfg.dataset.root, cfg.dataset.hazy_path)
+        self.clear_imgs_dir = os.path.join(cfg.dataset.root, cfg.dataset.clear_path)
+
+        self.hazy_imgs = sorted(os.listdir(self.hazy_imgs_dir))
+
+        # Clear-Bilder einmalig als Set laden (O(1) Lookup)
+        self.clear_set = set(os.listdir(self.clear_imgs_dir))
+
+        self.transforms = transforms
+
+    def __len__(self):
+        return len(self.hazy_imgs)
+
+    def __getitem__(self, index):
+        hazy_name = self.hazy_imgs[index]
+        hazy_path = os.path.join(self.hazy_imgs_dir, hazy_name)
+
+        # ID extrahieren
+        img_id = hazy_name.split("_")[0]
+        clear_name = img_id + ".jpg"
+
+        # Fast check with set
+        if clear_name not in self.clear_set:
+            raise FileNotFoundError(f"Clear image not found for {hazy_name} and {img_id}")
+
+        clear_path = os.path.join(self.clear_imgs_dir, clear_name)
+
+        hazy_img = Image.open(hazy_path).convert("RGB")
+        clear_img = Image.open(clear_path).convert("RGB")
+
+        if self.transforms:
+            seed = np.random.randint(2147483647)
+            torch.manual_seed(seed)
+            hazy_img = self.transforms(hazy_img)
+            torch.manual_seed(seed)
+            clear_img = self.transforms(clear_img)
+
+        return hazy_img, clear_img

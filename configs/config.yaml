@@ -1,9 +1,12 @@
 # config.yaml
 dataset:
-  name: "Paired_Hazy"
-  root: "./datasets/hazy-no-bb" # options: /RTTS/RTTS
+  name: "Reside_OTS"
+  root: "./datasets/RESIDE-OTS" # options: /RTTS/RTTS
+  hazy_path: "hazy-part2"
+  clear_path: "clear"
   img_size: 256
   return_bboxes: False
+  subset: 500 # Max 500 images. Set to False if you want to use full dataset
 
 training:
   device: "cuda"
