@@ -14,6 +14,8 @@ from tqdm import tqdm
 from evaluation.ssim_psnr_eval import ssim, psnr
 from evaluation.jetson_benchmark import TegrastatsMonitor
 
+from utils import cfg_select_model
+
 def calculate_psnr_ssim(
     model,
     dataloader,
@@ -72,10 +74,10 @@ def calculate_psnr_ssim(
 
     return avg_psnr, avg_ssim
 
-def run_benchmark(cfg, model):
+def run_benchmark(cfg):
 
     device = torch.device(cfg.benchmark.device)
-    model = model.to(device)
+    model = cfg_select_model(cfg, cfg.benchmark.device)
     model.eval()
 
     input_size = tuple(cfg.benchmark.input_size)

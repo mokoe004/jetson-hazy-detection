@@ -14,7 +14,7 @@ from dataloaders import ResideOTS
 from evaluation.evaluation import calculate_psnr_ssim
 from omegaconf import OmegaConf
 
-from utils import print_model_info
+from utils import print_model_info, cfg_select_model
 
 
 def train(cfg):
@@ -43,13 +43,7 @@ def train(cfg):
     # --------------------------------------------------
     # 3) Model + Optimizer
     # --------------------------------------------------
-    if cfg.model.name == "AODnet":
-        model = AODnet().to(device)
-    elif cfg.model.name == "LCAnet":
-        model = LCANet().to(device)
-    else:
-        print("Model not known. Fallback to AODNet")
-        model = AODnet().to(device)
+    model = cfg_select_model(cfg)
     print_model_info(model)
 
     def weights_init(m):
