@@ -77,53 +77,68 @@ def calculate_psnr_ssim(
 def run_benchmark(cfg):
 
     device = torch.device(cfg.benchmark.device)
-    model = cfg_select_model(cfg, cfg.benchmark.device)
+    model = cfg_select_model(cfg, device)
     model.eval()
 
     input_size = tuple(cfg.benchmark.input_size)
     dummy = torch.randn(input_size).to(device)
 
+    # Reset GPU memory stats
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats(device)
+
+    # ----------------------------------
     # Create run directory
+    # ----------------------------------
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = os.path.join(cfg.benchmark.save_path, f"run_{timestamp}")
     os.makedirs(run_dir, exist_ok=True)
 
-    # Save config
     OmegaConf.save(cfg, os.path.join(run_dir, "config.yaml"))
 
     monitor = None
     if cfg.benchmark.jetson.enable_tegrastats:
         monitor = TegrastatsMonitor()
 
+    # ----------------------------------
     # Warmup
+    # ----------------------------------
     for _ in range(cfg.benchmark.warmup):
         with torch.no_grad():
             if cfg.benchmark.use_fp16:
-                with torch.amp.autocast(cfg.benchmark.device):
+                with torch.autocast(device_type=device.type):
                     model(dummy)
             else:
                 model(dummy)
 
-    torch.cuda.synchronize()
+    if device.type == "cuda":
+        torch.cuda.synchronize()
 
     timings = []
 
+    # ----------------------------------
+    # Start Monitoring
+    # ----------------------------------
     if monitor:
         monitor.start()
 
+    # ----------------------------------
+    # Benchmark Loop
+    # ----------------------------------
     for _ in tqdm(range(cfg.benchmark.runs)):
         start = time.time()
 
         with torch.no_grad():
             if cfg.benchmark.use_fp16:
-                with torch.cuda.amp.autocast():
+                with torch.autocast(device_type=device.type):
                     model(dummy)
             else:
                 model(dummy)
 
-        torch.cuda.synchronize()
-        end = time.time()
+        if device.type == "cuda":
+            torch.cuda.synchronize()
 
+        end = time.time()
         timings.append((end - start) * 1000)
 
     if monitor:
@@ -131,52 +146,119 @@ def run_benchmark(cfg):
 
     timings = np.array(timings)
 
+    # ----------------------------------
+    # Core Latency Metrics
+    # ----------------------------------
+    mean_latency = float(timings.mean())
+
     metrics = {
-        "mean_latency_ms": float(timings.mean()),
+        "mean_latency_ms": mean_latency,
         "median_latency_ms": float(np.median(timings)),
+        "min_latency_ms": float(timings.min()),
+        "max_latency_ms": float(timings.max()),
         "p95_latency_ms": float(np.percentile(timings, 95)),
         "p99_latency_ms": float(np.percentile(timings, 99)),
         "std_latency_ms": float(timings.std()),
-        "fps": float(1000.0 / timings.mean()),
+        "fps": float(1000.0 / mean_latency),
     }
 
-    if monitor:
-        if monitor.gpu_usage:
-            metrics["avg_gpu_utilization_percent"] = float(np.mean(monitor.gpu_usage))
-        if monitor.power_usage:
-            metrics["avg_gpu_power_watt"] = float(np.mean(monitor.power_usage) / 1000)
-        if monitor.ram_usage:
-            metrics["avg_ram_usage_mb"] = float(np.mean(monitor.ram_usage))
+    # ----------------------------------
+    # GPU Memory Metrics
+    # ----------------------------------
+    if device.type == "cuda":
+        peak_mem_bytes = torch.cuda.max_memory_allocated(device)
+        peak_mem_mb = peak_mem_bytes / (1024 ** 2)
 
-    system_info = {
+        total_mem_bytes = torch.cuda.get_device_properties(device).total_memory
+        total_mem_mb = total_mem_bytes / (1024 ** 2)
+
+        metrics["peak_gpu_memory_mb"] = float(peak_mem_mb)
+        metrics["peak_gpu_memory_percent"] = float(
+            (peak_mem_mb / total_mem_mb) * 100.0
+        )
+
+    # ----------------------------------
+    # Parameter Metrics
+    # ----------------------------------
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(
+        p.numel() for p in model.parameters() if p.requires_grad
+    )
+
+    metrics["parameters_total"] = int(total_params)
+    metrics["parameters_trainable"] = int(trainable_params)
+    metrics["parameters_millions"] = float(total_params / 1e6)
+
+    # ----------------------------------
+    # Jetson Power / RAM Metrics
+    # ----------------------------------
+    if monitor:
+        jetson_metrics = monitor.get_metrics()
+        metrics.update(jetson_metrics)
+
+        # Energy per inference
+        if "avg_gpu_power_watt" in jetson_metrics:
+            avg_power = jetson_metrics["avg_gpu_power_watt"]
+            avg_latency_s = mean_latency / 1000.0
+            energy = avg_power * avg_latency_s
+
+            metrics["energy_per_inference_joule"] = float(energy)
+
+            if avg_power > 0:
+                metrics["fps_per_watt"] = float(metrics["fps"] / avg_power)
+
+    # ----------------------------------
+    # System Info
+    # ----------------------------------
+    metrics["system_info"] = {
         "platform": platform.platform(),
         "cuda_available": torch.cuda.is_available(),
-        "cuda_device": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu",
+        "cuda_device": torch.cuda.get_device_name(0)
+        if torch.cuda.is_available()
+        else "cpu",
     }
-    metrics["system_info"] = system_info
 
+    # ----------------------------------
     # Save JSON
+    # ----------------------------------
     with open(os.path.join(run_dir, "metrics.json"), "w") as f:
         json.dump(metrics, f, indent=4)
 
-    # Save CSV
+    # ----------------------------------
+    # Save CSV (nur flache Werte)
+    # ----------------------------------
+    flat_metrics = {
+        k: v for k, v in metrics.items() if not isinstance(v, dict)
+    }
+
     csv_path = os.path.join(run_dir, "metrics.csv")
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(metrics.keys())
-        writer.writerow(metrics.values())
+        writer.writerow(flat_metrics.keys())
+        writer.writerow(flat_metrics.values())
 
+    # ----------------------------------
+    # Environment
+    # ----------------------------------
     env = {
         "python_version": sys.version,
         "torch_version": torch.__version__,
         "cuda_version": torch.version.cuda,
     }
+
     with open(os.path.join(run_dir, "environment.json"), "w") as f:
         json.dump(env, f, indent=4)
 
+    # ----------------------------------
+    # Console Output (format safe)
+    # ----------------------------------
     print("\n===== Benchmark Finished =====")
+
     for k, v in metrics.items():
-        print(f"{k}: {v:.3f}")
+        if isinstance(v, (int, float)):
+            print(f"{k}: {v:.3f}")
+        else:
+            print(f"{k}: {v}")
 
     print(f"\nRun saved to: {run_dir}")
 

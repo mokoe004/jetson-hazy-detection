@@ -4,16 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="00522e64-b211-41a1-b53f-89b58b07b833" name="Changes" comment="Extend Benchmark with enviroment and platform infos">
-      <change afterPath="$PROJECT_DIR$/code/run_jetson.py" afterDir="false" />
+    <list default="true" id="00522e64-b211-41a1-b53f-89b58b07b833" name="Changes" comment="Enable tests on jetson xavier">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/code/evaluation/evaluation.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/evaluation/evaluation.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/models/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/models/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/models/ffa_net.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/models/ffa_net.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/train.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/train.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docker_run.sh" beforeDir="false" afterPath="$PROJECT_DIR$/docker_run.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/inference.Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/inference.Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/evaluation/jetson_benchmark.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/evaluation/jetson_benchmark.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/configs/inference_config.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/configs/inference_config.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -251,7 +246,7 @@
       <workItem from="1771845638120" duration="408000" />
       <workItem from="1771980215719" duration="9494000" />
       <workItem from="1772231049651" duration="21755000" />
-      <workItem from="1772400642636" duration="1645000" />
+      <workItem from="1772400642636" duration="2992000" />
     </task>
     <task id="LOCAL-00001" summary="Git init">
       <option name="closed" value="true" />
@@ -309,7 +304,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772254608479</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="Enable tests on jetson xavier">
+      <option name="closed" value="true" />
+      <created>1772402336980</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1772402336980</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -345,7 +348,8 @@
     <MESSAGE value="Add FFA Model" />
     <MESSAGE value="Add Jetson Benchmark" />
     <MESSAGE value="Extend Benchmark with enviroment and platform infos" />
-    <option name="LAST_COMMIT_MESSAGE" value="Extend Benchmark with enviroment and platform infos" />
+    <MESSAGE value="Enable tests on jetson xavier" />
+    <option name="LAST_COMMIT_MESSAGE" value="Enable tests on jetson xavier" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
