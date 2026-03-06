@@ -1,58 +1,118 @@
-# Perceptual Piercing: Human Visual Cue-Based Object Detection in Low Visibility Conditions
-<img src="/perceptual_piercing.png" alt="Perceptual Piercing" width="1000px">
+# Jetson Hazy Detection
 
-A novel deep-learning framework, inspired by the atmospheric scattering model and human visual cortex mechanisms, to enhance object detection under poor visibility scenarios such as fog, smoke, and haze. Implemented a multi-tiered strategy based on human-like visual cues that integrates an initial quick detection, followed by target-specific dehazing, and concludes with an in-depth detection phase.
+PyTorch-based dehazing project for low-visibility scenes, with training on paired hazy/clear datasets (RESIDE-OTS style) and inference benchmarking on NVIDIA Jetson devices.
+
+## Features
+
+- Multiple dehazing backbones: `AODnet`, `FFANet`, `LCANet`, `LDNet`, `LDFNet`
+- Config-driven training with YAML (`OmegaConf`)
+- Validation metrics: PSNR and SSIM
+- Jetson-focused benchmark pipeline with optional `tegrastats` monitoring
+- Docker setup for Jetson Xavier NX inference runs
+
+## Repository Layout
+
+```text
+.
+|- code/
+|  |- train.py                  # training entry point
+|  |- run_jetson.py             # benchmark entry point
+|  |- dataloaders.py            # dataset loaders (RESIDE-OTS, RTTS, paired)
+|  |- models/                   # model definitions
+|  \- evaluation/               # PSNR/SSIM + benchmark utilities
+|- configs/
+|  |- train_*.yaml              # model-specific training configs
+|  |- config.yaml               # default training config
+|  \- inference_config.yaml     # benchmark config
+|- pretrained_models/           # local checkpoints
+|- inference.Dockerfile         # Jetson inference container
+\- docker_run.sh               # helper script for Jetson Docker run
+```
 
 ## Installation
 
-To set up the repository, follow these steps:
+### Local (Python)
 
-1. Clone the repository
-```
-git clone https://github.com/ashu1069/perceptual-piercing.git
-cd perceptual-piercing
-```
-2. Create a Virtual Environment
-```
-python3 -m venv venv
-source venv/bin/activate
-```
-3. Install Required Libraries
-```
+```bash
+python -m venv .venv
+# Linux/macOS
+source .venv/bin/activate
+# Windows (PowerShell)
+.venv\Scripts\Activate.ps1
+
 pip install -r requirements.txt
 ```
-4. Download pre-trained models: Download the YOLOv5 and YOLOv8 pre-trained models and place them in the `models/` directory:
 
-## AOD-NetX
-<img src="/aodnetx.png" alt="AOD-NetX" width="1000px">
+### Jetson Docker (Xavier NX)
 
-1. **Dataset Preparation**: Prepare datasets using the corresponding `dataloader.py` script in the `AOD-NetX/` directory.
-2. **Generate Bounding Box Annotations**: Use `yolov5_annotations.py` and `yolov8_annotations.py` scripts to create bounding box annotations from the dataset directory.
-3. **Model Training**: Run `train.py` in the `AOD-NetX/` directory with clean images, foggy images, and the generated bounding box directory.
-4. **Model Testing**: Execute `test.py` in the `AOD-NetX/` directory to assess the dehazing performance of the model.
+```bash
+bash docker_run.sh
+```
 
-## Full Pipeline Evaluation
+This script:
+- sets max performance mode (`nvpmodel`, `jetson_clocks`)
+- builds `inference-jetson` from `inference.Dockerfile`
+- starts a container with NVIDIA runtime and project mounts
 
-To perform a complete evaluation of the pipeline, follow these steps:
+## Dataset Setup
 
-- Quick Object Detection with Lightweight YOLO Models:
-  - Use the `yolovx_annotations.py` script to perform initial object detection on the input images.
-  - This step generates preliminary bounding boxes using a lightweight YOLO model (YOLOv5n or YOLOv8n).
+Training expects a RESIDE-OTS-like structure (see `configs/train_*.yaml`):
 
-- Dehazing the Detected Regions:
-  - Use the bounding boxes from Step 1 to focus dehazing on specific regions of the images.
-  - Run `test_FC.py` if evaluating on the Foggy Cityscapes dataset, or `test_RESIDE.py` for the OTS and RTTS subsets of the RESIDE dataset.
+```text
+datasets/
+\- RESIDE-OTS/
+   |- hazy-part2/
+   \- clear/
+```
 
-- Final Object Detection with High-Precision YOLO Models:
-  - After dehazing, perform a final object detection using high-precision YOLO models (YOLOv5x or YOLOv8x) by re-running `yolovx_annotations.py` on the dehazed outputs.
+Set dataset paths in your selected config file:
+- `dataset.root`
+- `dataset.hazy_path`
+- `dataset.clear_path`
 
-- Performance Evaluation:
-  - Run `metrics.py` to evaluate the detection performance using standard metrics such as mean Average Precision (mAP).
-  - This script compares the detection results on dehazed images with ground truth annotations.
+## Training
 
+Run training with a config:
 
-## Evaluation Scripts
-1. **General Dehazing Evaluation**: Run `dehazing_evaluation.py` in the `evaluation/` directory to evaluate the performance of any general dehazing method.
-2. **Foggy Cityscapes Evaluation**: Use `test_FC.py` in the `evaluation/` directory to measure dehazing performance on the Foggy Cityscapes dataset.
-3. **RESIDE Dataset Evaluation**: Use `test_RESIDE.py` in the `evaluation/` directory to evaluate dehazing performance on the OTS and RTTS subsets of the RESIDE dataset.
-4. **Object Detection Performance**: Execute `metrics.py` in the `evaluation/` directory to assess object detection performance using the dehazed outputs. 
+```bash
+python code/train.py --config configs/train_aodnet.yaml
+```
+
+Other ready-to-use configs:
+- `configs/train_ffanet.yaml`
+- `configs/train_lcanet.yaml`
+- `configs/train_ldnet.yaml`
+- `configs/train_lfdnet.yaml`
+
+Outputs are written under the configured `model.save_path`:
+- timestamped run folder
+- `models/best_model.pth`
+- `models/last_model.pth`
+- `training_log.csv`
+- validation sample images in `outputs/`
+
+## Jetson Benchmark
+
+Run latency/FPS benchmark:
+
+```bash
+python code/run_jetson.py --config configs/inference_config.yaml
+```
+
+Main benchmark config options:
+- `benchmark.device` (`cuda`/`cpu`)
+- `benchmark.use_fp16`
+- `benchmark.input_size`
+- `benchmark.runs`, `benchmark.warmup`
+- `benchmark.jetson.enable_tegrastats`
+
+Results are saved to `runs/benchmark/run_YYYYMMDD_HHMMSS/`:
+- `metrics.json`
+- `metrics.csv`
+- `environment.json`
+- copied benchmark config
+
+## Notes
+
+- Use exact model names from `code/utils.py` in configs: `AODnet`, `FFANet`, `LCANet`, `LDNet`, `LDFNet`.
+- `yolov5_annotations.py` and `yolov8_annotations.py` are helper templates and require path/model adaptation before use.

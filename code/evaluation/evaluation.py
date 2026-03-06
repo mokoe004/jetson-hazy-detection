@@ -60,7 +60,7 @@ def calculate_psnr_ssim(
             num_batches += 1
 
             # Erstes Batch speichern
-            if save_example and i == 0 and out_dir is not None:
+            if save_example and i == 5 and out_dir is not None:
                 comparison = torch.cat(
                     [hazy[:1], prediction[:1], clear[:1]], dim=3
                 )
