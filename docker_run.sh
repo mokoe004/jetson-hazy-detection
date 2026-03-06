@@ -10,6 +10,6 @@ docker run -it \
   --network host \
   --ipc=host \
   --privileged \
-  -v $(pwd):/workspace \
+  -v $(pwd):/workspace/project \
   -v /usr/bin/tegrastats:/usr/bin/tegrastats \
   inference-jetson
