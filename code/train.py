@@ -1,6 +1,9 @@
-import os
-import time
+import argparse
 import csv
+import os
+from pathlib import Path
+import sys
+import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -8,13 +11,22 @@ from torch.utils.data import DataLoader, random_split, Subset
 from torchvision import transforms, utils
 from tqdm import tqdm
 
-from models.lca_net import LCANet
-from models.aod_net import AODnet
 from dataloaders import ResideOTS
 from evaluation.evaluation import calculate_psnr_ssim
 from omegaconf import OmegaConf
 
 from utils import print_model_info, cfg_select_model
+
+
+def configure_realtime_logging():
+    # Ensure logs are flushed line-by-line in notebook subprocesses.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            reconfigure = getattr(stream, "reconfigure", None)
+            if callable(reconfigure):
+                reconfigure(line_buffering=True, write_through=True)
+        except Exception:
+            pass
 
 
 def train(cfg):
@@ -25,8 +37,8 @@ def train(cfg):
 
     os.makedirs(cfg.model.save_path, exist_ok=True)
 
-    run_dir = os.path.join(cfg.model.save_path, time.strftime("run_%Y%m%d_%H%M%S"))
-    ckpt_dir = os.path.join(run_dir, "checkpoints")
+    run_dir = os.path.join(cfg.model.save_path, time.strftime("run_%Y_%m_%d_%H_%M_%S"))
+    ckpt_dir = os.path.join(run_dir, "models")
     out_dir = os.path.join(run_dir, "outputs")
     os.makedirs(ckpt_dir, exist_ok=True)
     os.makedirs(out_dir, exist_ok=True)
@@ -37,13 +49,13 @@ def train(cfg):
     # --------------------------------------------------
     # 2) Save Config
     # --------------------------------------------------
-    cfg_path = os.path.join(run_dir, "config.yaml")
+    cfg_path = os.path.join(run_dir, "run_config.yaml")
     OmegaConf.save(cfg, cfg_path)
 
     # --------------------------------------------------
     # 3) Model + Optimizer
     # --------------------------------------------------
-    model = cfg_select_model(cfg)
+    model = cfg_select_model(cfg, cfg.training.device if torch.cuda.is_available() else "cpu")
     print_model_info(model)
 
     def weights_init(m):
@@ -105,7 +117,7 @@ def train(cfg):
         pin_memory=True
     )
 
-    print(f"Train: {len(train_dataset)} | Val: {len(val_dataset)}\n")
+    print(f"Train: {len(train_dataset)} | Val: {len(val_dataset)}\n", flush=True)
 
     # --------------------------------------------------
     # 5) CSV Logger init
@@ -124,7 +136,13 @@ def train(cfg):
     best_path = os.path.join(ckpt_dir, "best_model.pth")
     last_path = os.path.join(ckpt_dir, "last_model.pth")
 
-    epoch_bar = tqdm(range(cfg.training.epochs), desc="Training", unit="epoch")
+    epoch_bar = tqdm(
+        range(cfg.training.epochs),
+        desc="Training",
+        unit="epoch",
+        file=sys.stdout,
+        dynamic_ncols=True,
+    )
 
     for epoch in epoch_bar:
         t0 = time.time()
@@ -187,3 +205,30 @@ def train(cfg):
     print(f"🧾 CSV log:   {csv_path}")
     print(f"🧠 Last:      {last_path}")
     print(f"🖼️ Outputs:   {out_dir}")
+
+
+def parse_args():
+    project_root = Path(__file__).resolve().parents[1]
+    default_config = project_root / "configs" / "config.yaml"
+
+    parser = argparse.ArgumentParser(description="Train dehazing model with YAML config.")
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=Path,
+        default=default_config,
+        help=f"Path to training config YAML (default: {default_config})",
+    )
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    configure_realtime_logging()
+    args = parse_args()
+    config_path = args.config.resolve()
+
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    cfg = OmegaConf.load(config_path)
+    train(cfg)

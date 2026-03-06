@@ -16,9 +16,9 @@ RUN pip3 install --upgrade pip
 COPY requirements.txt /workspace/requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-COPY code /workspace/code
-COPY pretrained_models /workspace/pretrained_models
-COPY configs /workspace/configs
+COPY code /workspace/project/code
+COPY pretrained_models /workspace/project/pretrained_models
+COPY configs /workspace/project/configs
 
 # Standardbefehl: YOLO Demo starten (z. B. Webcam)
 CMD ["bash"]

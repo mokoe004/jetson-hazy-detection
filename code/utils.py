@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from models import AODnet, FFANet, LCANet
+from models import AODnet, FFANet, LCANet, LDNet, LFDNet
 
 def print_model_info(model):
     """
@@ -28,6 +28,10 @@ def cfg_select_model(cfg, device: str) -> nn.Module:
         model = FFANet().to(device)
     elif cfg.model.name == "LCANet":
         model = LCANet().to(device)
+    elif cfg.model.name == "LDNet":
+        model = LDNet().to(device)
+    elif cfg.model.name == "LDFNet":
+        model = LFDNet().to(device)
     else:
         print("Model from cfg file not known. Fallback to AODNet")
         model = AODnet().to(device)

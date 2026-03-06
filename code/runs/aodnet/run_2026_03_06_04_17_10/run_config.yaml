@@ -1,0 +1,18 @@
+dataset:
+  name: Reside_OTS
+  root: ./datasets/RESIDE-OTS
+  hazy_path: hazy-part2
+  clear_path: clear
+  img_size: 256
+  return_bboxes: false
+  subset: 500
+training:
+  device: cuda
+  batch_size: 2
+  lr: 0.0001
+  weight_decay: 0.0
+  epochs: 20
+  num_workers: 0
+model:
+  name: AODNet
+  save_path: ./runs/aodnet

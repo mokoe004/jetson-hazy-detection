@@ -17,6 +17,8 @@ def benchmark_single_image(
 
     dummy_input = torch.randn(input_size).to(device)
 
+
+
     # -------- Warmup --------
     with torch.no_grad():
         for _ in range(warmup):

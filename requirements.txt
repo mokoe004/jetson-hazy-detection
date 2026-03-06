@@ -3,3 +3,4 @@ torchvision
 roboflow
 tqdm
 omegaconf
+opencv-python

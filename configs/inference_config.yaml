@@ -15,5 +15,5 @@ benchmark:
     enable_tegrastats: true
 
 model:
-  name: "LCANet" # options: AODNet, LCANet, FFANet
+  name: "LCANet" # options: AODNet, LCANet, FFANet, LDNet, LFDNet
   save_path: "./runs"
