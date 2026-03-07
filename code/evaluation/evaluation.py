@@ -77,7 +77,7 @@ def calculate_psnr_ssim(
 def run_benchmark(cfg):
 
     device = torch.device(cfg.benchmark.device)
-    model = cfg_select_model(cfg, device)
+    model = cfg_select_model(cfg, device.type)
     model.eval()
 
     input_size = tuple(cfg.benchmark.input_size)

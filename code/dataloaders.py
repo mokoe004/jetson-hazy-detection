@@ -95,8 +95,8 @@ def rtts_collate_fn(batch):
 class PairedDataset(Dataset):
     def __init__(self, cfg, transforms=None):
         self.cfg = cfg
-        self.hazy_imgs_dir = os.path.join(cfg.dataset.root, 'hazy_images')
-        self.clear_imgs_dir = os.path.join(cfg.dataset.root, 'clear_images')
+        self.hazy_imgs_dir = os.path.join(cfg.dataset.root, cfg.dataset.hazy_path)
+        self.clear_imgs_dir = os.path.join(cfg.dataset.root, cfg.dataset.clear_path)
         self.hazy_imgs = sorted(os.listdir(self.hazy_imgs_dir))
         self.clear_imgs = sorted(os.listdir(self.clear_imgs_dir))
         self.transforms = transforms
@@ -131,8 +131,16 @@ class ResideOTS(Dataset):
 
         self.hazy_imgs = sorted(os.listdir(self.hazy_imgs_dir))
 
-        # Clear-Bilder einmalig als Set laden (O(1) Lookup)
-        self.clear_set = set(os.listdir(self.clear_imgs_dir))
+        # Build a lookup from file stem -> full clear filename.
+        # Supports .jpg/.jpeg/.png (case-insensitive).
+        self.clear_name_by_stem = {}
+        clear_candidates = sorted(os.listdir(self.clear_imgs_dir))
+        for clear_name in clear_candidates:
+            stem, ext = os.path.splitext(clear_name)
+            if ext.lower() not in {".jpg", ".jpeg", ".png"}:
+                continue
+            # Keep first match deterministically (sorted order).
+            self.clear_name_by_stem.setdefault(stem, clear_name)
 
         self.transforms = transforms
 
@@ -145,10 +153,8 @@ class ResideOTS(Dataset):
 
         # ID extrahieren
         img_id = hazy_name.split("_")[0]
-        clear_name = img_id + ".jpg"
-
-        # Fast check with set
-        if clear_name not in self.clear_set:
+        clear_name = self.clear_name_by_stem.get(img_id)
+        if clear_name is None:
             raise FileNotFoundError(f"Clear image not found for {hazy_name} and {img_id}")
 
         clear_path = os.path.join(self.clear_imgs_dir, clear_name)
