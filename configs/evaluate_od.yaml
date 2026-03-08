@@ -1,0 +1,30 @@
+dataset:
+  name: "RTTS"
+  root: "./datasets/RTTS/RTTS"
+  img_size: 256
+  return_bboxes: true
+  subset: 200
+
+model:
+  name: "AODNet" # options: AODNet, FFANet, LCANet, LDNet, LFDNet, GCANet
+  save_path: "./runs/AODNet"
+
+evaluation_od:
+  device: "cuda"
+  use_dehazer: true
+  dehazer_checkpoint_path: "./pretrained_models/AOD-Net/best_model.pth"
+  save_path: "./runs/od_eval/AODNet_yolov8"
+  image_set: "test" # RTTS split file under ImageSets/Main/test.txt
+  batch_size: 1
+  num_workers: 0
+  pin_memory: true
+  dehazer_input_size: false # set int (e.g. 512) to force fixed dehazer size
+
+detector:
+  name: "yolov8"
+  weights: "./pretrained_models/YOLO/yolov8n.pt"
+  device: "cuda:0"
+  conf: 0.25
+  iou: 0.7
+  imgsz: 640
+  max_det: 300

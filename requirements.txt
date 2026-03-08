@@ -4,3 +4,4 @@ roboflow
 tqdm
 omegaconf
 opencv-python
+ultralytics

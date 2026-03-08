@@ -13,17 +13,7 @@ from torchvision import transforms
 
 from dataloaders import PairedDataset, ResideOTS
 from evaluation.evaluation import calculate_psnr_ssim
-from utils import cfg_select_model, print_model_info
-
-
-def configure_realtime_logging() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            reconfigure = getattr(stream, "reconfigure", None)
-            if callable(reconfigure):
-                reconfigure(line_buffering=True, write_through=True)
-        except Exception:
-            pass
+from utils import load_pretrained_dehazer
 
 
 def _select_dataset(cfg: DictConfig, transform):
@@ -33,20 +23,6 @@ def _select_dataset(cfg: DictConfig, transform):
     if dataset_name in {"paired", "paireddataset"}:
         return PairedDataset(cfg, transforms=transform)
     raise ValueError(f"Unsupported dataset.name '{cfg.dataset.name}' for evaluation.")
-
-
-def _resolve_checkpoint_path(cfg: DictConfig, project_root: Path) -> Path:
-    checkpoint_raw = OmegaConf.select(cfg, "evaluation.checkpoint_path")
-    if not checkpoint_raw:
-        raise ValueError("Missing 'evaluation.checkpoint_path' in config.")
-
-    checkpoint_path = Path(str(checkpoint_raw))
-    if not checkpoint_path.is_absolute():
-        checkpoint_path = (project_root / checkpoint_path).resolve()
-
-    if not checkpoint_path.exists():
-        raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
-    return checkpoint_path
 
 
 def _build_eval_loader(cfg: DictConfig):
@@ -116,8 +92,9 @@ def evaluate(cfg: DictConfig, config_path: Path) -> dict:
     project_root = Path(__file__).resolve().parents[1]
     device_str = OmegaConf.select(cfg, "evaluation.device", default=cfg.training.device)
     device = torch.device(device_str if torch.cuda.is_available() else "cpu")
-
-    checkpoint_path = _resolve_checkpoint_path(cfg, project_root)
+    checkpoint_raw = OmegaConf.select(cfg, "evaluation.checkpoint_path")
+    if not checkpoint_raw:
+        raise ValueError("Missing 'evaluation.checkpoint_path' in config.")
 
     save_root = OmegaConf.select(cfg, "evaluation.save_path", default="./runs/eval")
     run_root = Path(save_root)
@@ -127,20 +104,20 @@ def evaluate(cfg: DictConfig, config_path: Path) -> dict:
     outputs_dir = run_dir / "outputs"
     os.makedirs(outputs_dir, exist_ok=True)
 
+    model, checkpoint_path = load_pretrained_dehazer(
+        cfg=cfg,
+        device=device,
+        checkpoint_path=str(checkpoint_raw),
+        project_root=project_root,
+        strict=True,
+        print_info=True,
+    )
+
     cfg_to_save = OmegaConf.create(OmegaConf.to_container(cfg, resolve=True))
     cfg_to_save.evaluation = cfg_to_save.get("evaluation", {})
     cfg_to_save.evaluation["resolved_checkpoint_path"] = str(checkpoint_path)
     cfg_to_save.evaluation["source_config_path"] = str(config_path.resolve())
     OmegaConf.save(cfg_to_save, run_dir / "run_config.yaml")
-
-    model = cfg_select_model(cfg, device)
-    print_model_info(model)
-
-    state = torch.load(checkpoint_path, map_location=device)
-    if isinstance(state, dict) and "state_dict" in state:
-        state = state["state_dict"]
-    model.load_state_dict(state, strict=True)
-    model.eval()
 
     loader, eval_count, total_count = _build_eval_loader(cfg)
     print(f"Evaluation on {eval_count}/{total_count} samples ({OmegaConf.select(cfg, 'evaluation.split', default='val')})")
@@ -196,7 +173,6 @@ def parse_args():
 
 
 if __name__ == "__main__":
-    configure_realtime_logging()
     args = parse_args()
     config_path = args.config.resolve()
     if not config_path.exists():

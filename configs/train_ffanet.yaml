@@ -6,7 +6,7 @@ dataset:
   clear_path: "clear"
   img_size: 256
   return_bboxes: false
-  subset: 500
+  subset: 20
 
 training:
   device: "cuda"

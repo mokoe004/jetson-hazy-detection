@@ -7,6 +7,7 @@ PyTorch-based dehazing project for low-visibility scenes, with training on paire
 - Multiple dehazing backbones: `AODnet`, `FFANet`, `LCANet`, `LDNet`, `LDFNet`
 - Config-driven training with YAML (`OmegaConf`)
 - Validation metrics: PSNR and SSIM
+- Object detection evaluation after dehazing (`precision`, `recall`, `mAP@0.5`, `mAP@0.5:0.95`)
 - Jetson-focused benchmark pipeline with optional `tegrastats` monitoring
 - Docker setup for Jetson Xavier NX inference runs
 
@@ -111,6 +112,24 @@ Results are saved to `runs/benchmark/run_YYYYMMDD_HHMMSS/`:
 - `metrics.csv`
 - `environment.json`
 - copied benchmark config
+
+## Dehaze + Object Detection Evaluation
+
+Run end-to-end evaluation of `dehazer -> detector`:
+
+```bash
+python code/evaluate_od.py --config configs/evaluate_od.yaml
+```
+
+Default setup uses:
+- `RTTSDataset` with bounding boxes (`dataset.return_bboxes: true`)
+- dehazing checkpoint from `evaluation_od.dehazer_checkpoint_path`
+- YOLOv8 detector from `detector.weights`
+
+Results are saved to `runs/od_eval/.../run_YYYY_MM_DD_HH_MM_SS/`:
+- `metrics.json`
+- `metrics.csv`
+- `run_config.yaml`
 
 ## Notes
 

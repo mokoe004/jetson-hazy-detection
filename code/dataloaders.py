@@ -60,7 +60,12 @@ class RTTSDataset(Dataset):
         }
 
         if self.transforms:
-            img, target = self.transforms(img, target)
+            try:
+                # Albumentations-style / custom transforms that accept image + target.
+                img, target = self.transforms(img, target)
+            except TypeError:
+                # Torchvision Compose usually accepts only the image tensor.
+                img = self.transforms(img)
 
         return img, target
 

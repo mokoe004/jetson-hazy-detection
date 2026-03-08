@@ -5,7 +5,7 @@ dataset:
   clear_path: "clear" # only used for Reside_OTS
   img_size: 256
   return_bboxes: false
-  subset: False # int limit, or false for full dataset
+  subset: false # int limit, or false for full dataset
 
 training:
   device: "cuda"
@@ -13,13 +13,13 @@ training:
   num_workers: 0
 
 model:
-  name: "LDNet" # options: AODNet, LCANet, FFANet, LDNet, LFDNet
-  save_path: "./runs/LDNet"
+  name: "AODNet" # options: AODNet, LCANet, FFANet, LDNet, LFDNet
+  save_path: "./runs/AODNet"
 
 evaluation:
   device: "cuda" # fallback to cpu if cuda is unavailable
-  checkpoint_path: "./pretrained_models/LD-Net/Epoch59.pth" # required
-  save_path: "./runs/eval/LDNet" # output root for eval runs
+  checkpoint_path: "./pretrained_models/AOD-Net/best_model.pth" # required
+  save_path: "./runs/eval/AODNet" # output root for eval runs
   split: "full" # val | train | full
   val_split: 0.2 # only used when split is val or train
   seed: 42 # random split seed
