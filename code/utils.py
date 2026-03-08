@@ -3,7 +3,7 @@ import torch.nn as nn
 from pathlib import Path
 import pickle
 
-from models import AODNet, FFANet, LCANet, LDNet, LFDNet, GCANet
+from models import AODNet, FFANet, LCANet, LDNet, LFDNet, GCANet, TinyDehazeNet
 
 def print_model_info(model):
     """
@@ -36,6 +36,9 @@ def cfg_select_model(cfg, device: str) -> nn.Module:
         model = LFDNet().to(torch_device)
     elif cfg.model.name == "GCANet":
         model = GCANet().to(torch_device)
+    elif cfg.model.name == "TinyDehazeNet":
+        base_channels = int(getattr(cfg.model, "base_channels", 16))
+        model = TinyDehazeNet(base_channels=base_channels).to(torch_device)
     else:
         print("Model from cfg file not known. Fallback to AODNet")
         model = AODNet().to(torch_device)

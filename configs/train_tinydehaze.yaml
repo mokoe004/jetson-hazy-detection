@@ -1,4 +1,4 @@
-# train_aodnet.yaml
+# train_tinydehaze.yaml
 dataset:
   name: "Reside_OTS"
   root: "./datasets/RESIDE-OTS"
@@ -10,18 +10,21 @@ dataset:
 
 training:
   device: "cuda"
-  batch_size: 2
-  lr: 0.0001
+  batch_size: 4
+  lr: 0.0002
   weight_decay: 0.0
-  epochs: 20
+  epochs: 30
   num_workers: 0
   selection_metric: "hybrid" # psnr | map50 | hybrid
-  od_eval_every: 5
+  od_eval_every: 10
+  od_eval_subset: 100
   alpha_latency: 0.001
+  perf_batches: 10
 
 model:
-  name: "AODNet"
-  save_path: "./runs/aodnet"
+  name: "TinyDehazeNet"
+  base_channels: 8
+  save_path: "./runs/tinydehaze"
 
 detector:
   name: "yolov8"
@@ -29,7 +32,7 @@ detector:
   device: "cuda:0"
   conf: 0.25
   iou: 0.7
-  imgsz: 640
+  imgsz: 512
   max_det: 300
 
 evaluation_od:
@@ -38,4 +41,4 @@ evaluation_od:
   batch_size: 1
   num_workers: 0
   pin_memory: true
-  dehazer_input_size: false
+  dehazer_input_size: 224
