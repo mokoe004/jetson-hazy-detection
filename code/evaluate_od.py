@@ -14,20 +14,10 @@ from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 from tqdm import tqdm
 
-from dataloaders import RTTSDataset, rtts_collate_fn
+from datasets import RTTSDataset, rtts_collate_fn
 from detectors import YOLOv8Adapter
 from evaluation.od_metrics import EvalSample, evaluate_detection
 from utils import load_pretrained_dehazer
-
-
-def configure_realtime_logging() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            reconfigure = getattr(stream, "reconfigure", None)
-            if callable(reconfigure):
-                reconfigure(line_buffering=True, write_through=True)
-        except Exception:
-            pass
 
 
 def _build_rtts_loader(cfg: DictConfig):
@@ -222,7 +212,6 @@ def parse_args():
 
 
 if __name__ == "__main__":
-    configure_realtime_logging()
     args = parse_args()
     config_path = args.config.resolve()
     if not config_path.exists():

@@ -3,7 +3,7 @@ dataset:
   root: "./datasets/RTTS/RTTS"
   img_size: 256
   return_bboxes: true
-  subset: 200
+  subset: 500
 
 model:
   name: "AODNet" # options: AODNet, FFANet, LCANet, LDNet, LFDNet, GCANet
@@ -11,7 +11,7 @@ model:
 
 evaluation_od:
   device: "cuda"
-  use_dehazer: true
+  use_dehazer: false
   dehazer_checkpoint_path: "./pretrained_models/AOD-Net/best_model.pth"
   save_path: "./runs/od_eval/AODNet_yolov8"
   image_set: "test" # RTTS split file under ImageSets/Main/test.txt

@@ -11,7 +11,7 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader, Subset, random_split
 from torchvision import transforms
 
-from dataloaders import PairedDataset, ResideOTS
+from datasets import PairedDataset, ResideOTS
 from evaluation.evaluation import calculate_psnr_ssim
 from utils import load_pretrained_dehazer
 

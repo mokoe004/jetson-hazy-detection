@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader, random_split, Subset
 from torchvision import transforms, utils
 from tqdm import tqdm
 
-from dataloaders import ResideOTS
+from datasets import ResideOTS
 from evaluation.evaluation import calculate_psnr_ssim
 from omegaconf import OmegaConf
 
