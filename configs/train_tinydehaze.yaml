@@ -15,7 +15,7 @@ training:
   weight_decay: 0.0
   epochs: 30
   num_workers: 0
-  selection_metric: "hybrid" # psnr | map50 | hybrid
+  selection_metric: "hybrid" # psnr | map50 | hybrid (additionally saves best_psnr and best_map50)
   od_eval_every: 10
   od_eval_subset: 100
   alpha_latency: 0.001

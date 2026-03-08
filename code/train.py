@@ -97,14 +97,17 @@ def train(cfg, config_path: Optional[Path] = None):
 
     os.makedirs(cfg.model.save_path, exist_ok=True)
 
-    run_dir = os.path.join(cfg.model.save_path, time.strftime("run_%Y_%m_%d_%H_%M_%S"))
-    ckpt_dir = os.path.join(run_dir, "models")
+    run_name = time.strftime("run_%Y_%m_%d_%H_%M_%S")
+    run_dir = os.path.join(cfg.model.save_path, run_name)
+    checkpoint_root = str(OmegaConf.select(cfg, "training.checkpoint_root", default="./checkpoints"))
+    ckpt_dir = os.path.join(checkpoint_root, run_name)
     out_dir = os.path.join(run_dir, "outputs")
     os.makedirs(ckpt_dir, exist_ok=True)
     os.makedirs(out_dir, exist_ok=True)
 
     print(f"\nTraining on {device}")
     print(f"Run directory: {run_dir}\n")
+    print(f"Checkpoint directory: {ckpt_dir}\n")
 
     # --------------------------------------------------
     # 2) Save Config
@@ -220,8 +223,11 @@ def train(cfg, config_path: Optional[Path] = None):
         raise ValueError("selection_metric uses OD metrics, but no detector config is provided.")
 
     best_psnr = float("-inf")
+    best_map50 = float("-inf")
     best_score = float("-inf")
     best_path = os.path.join(ckpt_dir, "best_model.pth")
+    best_psnr_path = os.path.join(ckpt_dir, "best_psnr_model.pth")
+    best_map50_path = os.path.join(ckpt_dir, "best_map50_model.pth")
     last_path = os.path.join(ckpt_dir, "last_model.pth")
 
     epoch_bar = tqdm(
@@ -271,8 +277,10 @@ def train(cfg, config_path: Optional[Path] = None):
 
         scheduler.step(avg_psnr)
 
-        # -------- Save LAST every epoch --------
+        # -------- Save LAST + per-epoch checkpoint --------
         torch.save(model.state_dict(), last_path)
+        epoch_ckpt_path = os.path.join(ckpt_dir, f"epoch_{epoch + 1:03d}.pth")
+        torch.save(model.state_dict(), epoch_ckpt_path)
 
         # -------- Optional OD eval (RTTS) --------
         od_map50 = None
@@ -288,6 +296,11 @@ def train(cfg, config_path: Optional[Path] = None):
         # -------- Track BEST --------
         if avg_psnr > best_psnr:
             best_psnr = avg_psnr
+            torch.save(model.state_dict(), best_psnr_path)
+
+        if od_map50 is not None and od_map50 > best_map50:
+            best_map50 = od_map50
+            torch.save(model.state_dict(), best_map50_path)
 
         if selection_metric == "psnr":
             selection_score = float(avg_psnr)
@@ -343,7 +356,9 @@ def train(cfg, config_path: Optional[Path] = None):
 
     print("\nTraining finished.")
     print(f"Best model: {best_path} (score={best_score:.4f}, metric={selection_metric})")
-    print(f"Best PSNR observed: {best_psnr:.2f}")
+    print(f"Best PSNR model: {best_psnr_path} (PSNR={best_psnr:.2f})")
+    if best_map50 > float("-inf"):
+        print(f"Best mAP50 model: {best_map50_path} (mAP50={best_map50:.4f})")
     print(f"CSV log:   {csv_path}")
     print(f"Last:      {last_path}")
     print(f"Outputs:   {out_dir}")
