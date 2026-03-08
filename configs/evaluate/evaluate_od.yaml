@@ -6,13 +6,14 @@ dataset:
   subset: 500
 
 model:
-  name: "AODNet" # options: AODNet, FFANet, LCANet, LDNet, LFDNet, GCANet
-  save_path: "./runs/AODNet"
+  name: "TinyDehazeNet" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
+  base_channels: 8 # relevant for TinyDehazeNet
 
 evaluation_od:
   device: "cuda"
-  use_dehazer: false
-  dehazer_checkpoint_path: "./pretrained_models/AOD-Net/best_model.pth"
+  use_dehazer: True
+  #dehazer_checkpoint_path: "./pretrained_models/AOD-Net/epoch3_full_OTS_subset.pth"
+  dehazer_checkpoint_path: "./runs/tinydehaze/run_2026_03_08_03_21_08/models/best_model.pth"
   save_path: "./runs/od_eval/AODNet_yolov8"
   image_set: "test" # RTTS split file under ImageSets/Main/test.txt
   batch_size: 1

@@ -215,6 +215,12 @@ def train(cfg, config_path: Optional[Path] = None):
     od_eval_every = int(OmegaConf.select(cfg, "training.od_eval_every", default=5))
     alpha_latency = float(OmegaConf.select(cfg, "training.alpha_latency", default=0.001))
     perf_batches = int(OmegaConf.select(cfg, "training.perf_batches", default=10))
+    early_stopping_enabled = bool(OmegaConf.select(cfg, "training.early_stopping.enabled", default=False))
+    early_stopping_patience = int(OmegaConf.select(cfg, "training.early_stopping.patience", default=5))
+    early_stopping_min_delta = float(OmegaConf.select(cfg, "training.early_stopping.min_delta", default=0.0))
+    early_stopping_metric = str(
+        OmegaConf.select(cfg, "training.early_stopping.metric", default="selection_score")
+    ).lower()
 
     if selection_metric not in {"psnr", "map50", "hybrid"}:
         raise ValueError("training.selection_metric must be one of: psnr, map50, hybrid")
@@ -222,9 +228,17 @@ def train(cfg, config_path: Optional[Path] = None):
     if not od_eval_enabled and selection_metric in {"map50", "hybrid"}:
         raise ValueError("selection_metric uses OD metrics, but no detector config is provided.")
 
+    if early_stopping_patience < 1:
+        raise ValueError("training.early_stopping.patience must be >= 1")
+
+    if early_stopping_metric not in {"selection_score", "psnr"}:
+        raise ValueError("training.early_stopping.metric must be one of: selection_score, psnr")
+
     best_psnr = float("-inf")
     best_map50 = float("-inf")
     best_score = float("-inf")
+    best_early_stopping_score = float("-inf")
+    early_stopping_wait = 0
     best_path = os.path.join(ckpt_dir, "best_model.pth")
     best_psnr_path = os.path.join(ckpt_dir, "best_psnr_model.pth")
     best_map50_path = os.path.join(ckpt_dir, "best_map50_model.pth")
@@ -316,6 +330,17 @@ def train(cfg, config_path: Optional[Path] = None):
             best_score = selection_score
             torch.save(model.state_dict(), best_path)
 
+        if early_stopping_metric == "psnr":
+            early_stopping_score = float(avg_psnr)
+        else:
+            early_stopping_score = float(selection_score)
+
+        if early_stopping_score > best_early_stopping_score + early_stopping_min_delta:
+            best_early_stopping_score = early_stopping_score
+            early_stopping_wait = 0
+        else:
+            early_stopping_wait += 1
+
         # -------- CSV write --------
         lr = scheduler.optimizer.param_groups[0]["lr"]
         epoch_time = time.time() - t0
@@ -354,6 +379,13 @@ def train(cfg, config_path: Optional[Path] = None):
             f"LR: {lr:.2e} | {epoch_time:.1f}s"
         )
 
+        if early_stopping_enabled and early_stopping_wait >= early_stopping_patience:
+            tqdm.write(
+                f"Early stopping at epoch {epoch + 1}: "
+                f"no improvement in '{early_stopping_metric}' for {early_stopping_patience} epoch(s)."
+            )
+            break
+
     print("\nTraining finished.")
     print(f"Best model: {best_path} (score={best_score:.4f}, metric={selection_metric})")
     print(f"Best PSNR model: {best_psnr_path} (PSNR={best_psnr:.2f})")
@@ -366,7 +398,7 @@ def train(cfg, config_path: Optional[Path] = None):
 
 def parse_args():
     project_root = Path(__file__).resolve().parents[1]
-    default_config = project_root / "configs" / "config.yaml"
+    default_config = project_root / "configs" / "train" / "config.yaml"
 
     parser = argparse.ArgumentParser(description="Train dehazing model with YAML config.")
     parser.add_argument(

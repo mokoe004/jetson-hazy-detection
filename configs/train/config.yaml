@@ -1,0 +1,54 @@
+# config.yaml
+# Basiskonfiguration fuer Training und optionales OD-gestuetztes Model-Selection.
+dataset:
+  name: "Reside_OTS" # options: Reside_OTS | Paired (alias: PairedDataset)
+  root: "./datasets/RESIDE-OTS" # Root des Datensatzes
+  hazy_path: "hazy-part2" # nur fuer Reside_OTS
+  clear_path: "clear" # nur fuer Reside_OTS
+  img_size: 256 # Resize auf (img_size, img_size)
+  return_bboxes: false # fuer Dehazing-Training i.d.R. false
+  subset: 500 # int fuer Teilmenge, oder false fuer kompletten Datensatz
+
+training:
+  device: "cuda" # cuda | cpu
+  batch_size: 2
+  lr: 0.0001
+  weight_decay: 0.0
+  epochs: 20
+  num_workers: 0
+  checkpoint_root: "./checkpoints" # Ordner fuer best/last/epoch_XXX Checkpoints
+  selection_metric: "psnr" # options: psnr | map50 | hybrid
+  od_eval_every: 5 # nur relevant fuer map50/hybrid
+  od_eval_subset: 300 # RTTS-Subset fuer OD-Eval waehrend Training
+  alpha_latency: 0.001 # nur fuer hybrid: score = map50 - alpha * avg_dehaze_ms
+  perf_batches: 10 # Anzahl Batches fuer Dehaze-Latenzmessung pro Epoche
+  early_stopping:
+    enabled: false
+    patience: 5
+    min_delta: 0.0
+    metric: "selection_score" # options: selection_score | psnr
+
+model:
+  name: "LCANet" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
+  save_path: "./runs/lcanet" # Run-Ordner fuer Logs/Outputs
+
+# Optional/erforderlich fuer selection_metric=map50 oder hybrid
+detector:
+  name: "yolov8" # aktuell nur yolov8 unterstuetzt
+  weights: "./pretrained_models/YOLO/yolov8n.pt"
+  device: "cuda:0" # cuda:0 | cpu
+  conf: 0.25
+  iou: 0.7
+  imgsz: 640
+  max_det: 300
+
+# Optional: Konfiguration fuer OD-Evaluation innerhalb des Trainings
+# (train.py setzt use_dehazer/checkpoint automatisch)
+evaluation_od:
+  device: "cuda" # cuda | cpu
+  save_path: "./runs/od_eval/lcanet_yolov8" # Zielordner fuer OD-Eval-Runs
+  image_set: "test" # RTTS split file in ImageSets/Main
+  batch_size: 1
+  num_workers: 0
+  pin_memory: true
+  dehazer_input_size: false # false oder int (z.B. 224/256/512)

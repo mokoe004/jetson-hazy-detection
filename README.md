@@ -22,9 +22,14 @@ PyTorch-based dehazing project for low-visibility scenes, with training on paire
 |  |- models/                   # model definitions
 |  \- evaluation/               # PSNR/SSIM + benchmark utilities
 |- configs/
-|  |- train_*.yaml              # model-specific training configs
-|  |- config.yaml               # default training config
-|  \- inference_config.yaml     # benchmark config
+|  |- train/
+|  |  |- config.yaml            # default training config
+|  |  \- train_*.yaml           # model-specific training configs
+|  |- evaluate/
+|  |  |- evaluate.yaml          # dehazing evaluation config
+|  |  \- evaluate_od.yaml       # dehaze + OD evaluation config
+|  \- inference/
+|     \- inference_config.yaml  # benchmark config
 |- pretrained_models/           # local checkpoints
 |- inference.Dockerfile         # Jetson inference container
 \- docker_run.sh               # helper script for Jetson Docker run
@@ -57,7 +62,7 @@ This script:
 
 ## Dataset Setup
 
-Training expects a RESIDE-OTS-like structure (see `configs/train_*.yaml`):
+Training expects a RESIDE-OTS-like structure (see `configs/train/train_*.yaml`):
 
 ```text
 datasets/
@@ -76,14 +81,14 @@ Set dataset paths in your selected config file:
 Run training with a config:
 
 ```bash
-python code/train.py --config configs/train_aodnet.yaml
+python code/train.py --config configs/train/train_aodnet.yaml
 ```
 
 Other ready-to-use configs:
-- `configs/train_ffanet.yaml`
-- `configs/train_lcanet.yaml`
-- `configs/train_ldnet.yaml`
-- `configs/train_lfdnet.yaml`
+- `configs/train/train_ffanet.yaml`
+- `configs/train/train_lcanet.yaml`
+- `configs/train/train_ldnet.yaml`
+- `configs/train/train_lfdnet.yaml`
 
 Outputs are written under the configured `model.save_path`:
 - timestamped run folder
@@ -97,7 +102,7 @@ Outputs are written under the configured `model.save_path`:
 Run latency/FPS benchmark:
 
 ```bash
-python code/run_jetson.py --config configs/inference_config.yaml
+python code/run_jetson.py --config configs/inference/inference_config.yaml
 ```
 
 Main benchmark config options:
@@ -118,7 +123,7 @@ Results are saved to `runs/benchmark/run_YYYYMMDD_HHMMSS/`:
 Run end-to-end evaluation of `dehazer -> detector`:
 
 ```bash
-python code/evaluate_od.py --config configs/evaluate_od.yaml
+python code/evaluate_od.py --config configs/evaluate/evaluate_od.yaml
 ```
 
 Default setup uses:

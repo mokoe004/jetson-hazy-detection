@@ -5,7 +5,7 @@ dataset:
   clear_path: "clear" # only used for Reside_OTS
   img_size: 256
   return_bboxes: false
-  subset: false # int limit, or false for full dataset
+  subset: 500 # int limit, or false for full dataset
 
 training:
   device: "cuda"
@@ -13,12 +13,13 @@ training:
   num_workers: 0
 
 model:
-  name: "AODNet" # options: AODNet, LCANet, FFANet, LDNet, LFDNet
-  save_path: "./runs/AODNet"
+  name: "TinyDehazeNet" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
+  base_channels: 8 # relevant for TinyDehazeNet
 
 evaluation:
   device: "cuda" # fallback to cpu if cuda is unavailable
-  checkpoint_path: "./pretrained_models/AOD-Net/best_model.pth" # required
+  #checkpoint_path: "./pretrained_models/AOD-Net/epoch3_full_OTS_subset.pth" # required
+  checkpoint_path: "./runs/tinydehaze/run_2026_03_08_03_21_08/models/last_model.pth"
   save_path: "./runs/eval/AODNet" # output root for eval runs
   split: "full" # val | train | full
   val_split: 0.2 # only used when split is val or train

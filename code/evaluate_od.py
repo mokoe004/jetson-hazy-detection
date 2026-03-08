@@ -198,7 +198,7 @@ def run_od_evaluation(cfg: DictConfig, config_path: Path) -> dict:
 
 def parse_args():
     project_root = Path(__file__).resolve().parents[1]
-    default_config = project_root / "configs" / "evaluate_od.yaml"
+    default_config = project_root / "configs" / "evaluate" / "evaluate_od.yaml"
 
     parser = argparse.ArgumentParser(description="Evaluate dehaze + object detection pipeline.")
     parser.add_argument(

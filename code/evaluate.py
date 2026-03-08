@@ -159,7 +159,7 @@ def evaluate(cfg: DictConfig, config_path: Path) -> dict:
 
 def parse_args():
     project_root = Path(__file__).resolve().parents[1]
-    default_config = project_root / "configs" / "config.yaml"
+    default_config = project_root / "configs" / "evaluate" / "evaluate.yaml"
 
     parser = argparse.ArgumentParser(description="Evaluate dehazing model with YAML config.")
     parser.add_argument(

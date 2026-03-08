@@ -3,7 +3,7 @@ import torch.nn as nn
 from pathlib import Path
 import pickle
 
-from models import AODNet, FFANet, LCANet, LDNet, LFDNet, GCANet, TinyDehazeNet
+from models import AODNet, AODnetDepthwiseSpatial, FFANet, LCANet, LDNet, LFDNet, GCANet, TinyDehazeNet
 
 def print_model_info(model):
     """
@@ -26,6 +26,8 @@ def cfg_select_model(cfg, device: str) -> nn.Module:
     torch_device = torch.device(device)
     if cfg.model.name == "AODNet":
         model = AODNet().to(torch_device)
+    elif cfg.model.name == "AODNetDepthwiseSpatial":
+        model = AODnetDepthwiseSpatial().to(torch_device)
     elif cfg.model.name == "FFANet":
         model = FFANet().to(torch_device)
     elif cfg.model.name == "LCANet":
