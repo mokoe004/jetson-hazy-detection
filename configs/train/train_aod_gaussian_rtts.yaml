@@ -1,0 +1,68 @@
+# train_aod_gaussian_rtts.yaml
+dataset:
+  name: "Reside_OTS" # paired hazy/clear training
+  root: "./datasets/RESIDE-OTS"
+  hazy_path: "hazy-part2"
+  clear_path: "clear"
+  img_size: 256
+  return_bboxes: false
+  subset: 500 # int or false
+
+training:
+  device: "cuda" # cuda | cpu
+  batch_size: 2
+  lr: 0.0001
+  weight_decay: 0.0
+  epochs: 30
+  num_workers: 0
+  checkpoint_root: "./checkpoints"
+  selection_metric: "hybrid" # psnr | map50 | hybrid
+  od_eval_every: 5
+  od_eval_subset: 100
+  alpha_latency: 0.001
+  perf_batches: 10
+  early_stopping:
+    enabled: false
+    patience: 5
+    min_delta: 0.0
+    metric: "selection_score"
+  loss:
+    mse_weight: 0.0
+    l1_weight: 1.0
+    ssim_weight: 0.1
+
+model:
+  name: "AODNetDepthwiseGaussian"
+  base_channels: 8 # 3 ~= original AOD capacity, >3 widens the network
+  sigma_scale: 0.3
+  heatmap_augmentation: true
+  alpha_init: 0.5
+  use_gaussian_attention: true
+  use_se_attention: true
+  se_reduction: 8
+  save_path: "./runs/AODNetDepthwiseGaussian"
+
+  # Ablation examples:
+  # baseline-like: base_channels=3, use_gaussian_attention=false, use_se_attention=false
+  # only wider:     base_channels=8, use_gaussian_attention=false, use_se_attention=false
+  # wider+gauss:    base_channels=8, use_gaussian_attention=true, use_se_attention=false
+  # wider+se:       base_channels=8, use_gaussian_attention=false, use_se_attention=true
+
+detector:
+  name: "yolov8"
+  weights: "./pretrained_models/YOLO/yolov8n.pt"
+  device: "cuda:0"
+  conf: 0.25
+  iou: 0.5
+  imgsz: 512
+  max_det: 300
+
+evaluation_od:
+  device: "cuda"
+  save_path: "./runs/od_eval/AODNetDepthwiseGaussian_yolov8"
+  image_set: "test"
+  batch_size: 1
+  num_workers: 0
+  pin_memory: true
+  dehazer_input_size: 256
+  dehazer_checkpoint_path: "runs/AODNetDepthwiseGaussian/run_2026_03_11_22_33_07/models/best_map50_model.pth"

@@ -169,3 +169,30 @@ def evaluate_detection(
         "num_classes_observed": float(len(class_ids)),
     }
 
+
+def evaluate_detection_per_class(
+    samples: List[EvalSample],
+    iou_thr: float = 0.5,
+) -> Dict[int, Dict[str, float]]:
+    class_ids = set()
+    for s in samples:
+        class_ids.update(int(v) for v in s.gt_labels.tolist())
+        class_ids.update(int(v) for v in s.pred_labels.tolist())
+    class_ids = sorted(class_ids)
+
+    per_class: Dict[int, Dict[str, float]] = {}
+    for class_id in class_ids:
+        ap, tp, fp, n_gt = _class_ap_at_iou(samples, class_id=class_id, iou_thr=iou_thr)
+        if np.isnan(ap):
+            ap = 0.0
+        precision = float(tp / max(tp + fp, 1))
+        recall = float(tp / max(n_gt, 1))
+        per_class[class_id] = {
+            "ap50": float(ap),
+            "precision": precision,
+            "recall": recall,
+            "tp": float(tp),
+            "fp": float(fp),
+            "gt": float(n_gt),
+        }
+    return per_class

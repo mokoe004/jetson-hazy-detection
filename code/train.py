@@ -13,9 +13,10 @@ from torch.utils.data import DataLoader, random_split, Subset
 from torchvision import transforms
 from tqdm import tqdm
 
-from datasets import ResideOTS
+from datasets import PairedDataset, ResideOTS
 from evaluate_od import run_od_evaluation
 from evaluation.evaluation import calculate_psnr_ssim
+from evaluation.ssim_psnr_eval import ssim
 from omegaconf import OmegaConf
 
 from utils import print_model_info, cfg_select_model
@@ -89,6 +90,45 @@ def _measure_dehaze_perf_ms(model, dataloader, device, max_batches: int = 10):
     return avg_ms, fps
 
 
+def _is_gaussian_model_name(model_name: str) -> bool:
+    return str(model_name).strip().lower() in {"aodnetdepthwisegaussian"}
+
+
+class WeightedDehazeLoss(nn.Module):
+    def __init__(self, mse_weight=0.0, l1_weight=1.0, ssim_weight=0.1):
+        super().__init__()
+        self.mse_weight = float(mse_weight)
+        self.l1_weight = float(l1_weight)
+        self.ssim_weight = float(ssim_weight)
+        self.mse = nn.MSELoss()
+        self.l1 = nn.L1Loss()
+
+        if self.mse_weight == 0.0 and self.l1_weight == 0.0 and self.ssim_weight == 0.0:
+            raise ValueError("At least one training.loss weight must be > 0.")
+
+    def forward(self, prediction, target):
+        loss = prediction.new_tensor(0.0)
+        if self.mse_weight > 0.0:
+            loss = loss + self.mse_weight * self.mse(prediction, target)
+        if self.l1_weight > 0.0:
+            loss = loss + self.l1_weight * self.l1(prediction, target)
+        if self.ssim_weight > 0.0:
+            loss = loss + self.ssim_weight * (1.0 - ssim(prediction, target))
+        return loss
+
+
+def _select_training_dataset(cfg, transform):
+    dataset_name = str(cfg.dataset.name).lower()
+    if dataset_name in {"reside_ots", "resideots"}:
+        return ResideOTS(cfg, transforms=transform)
+    if dataset_name in {"paired", "paireddataset"}:
+        return PairedDataset(cfg, transforms=transform)
+    raise ValueError(
+        f"Unsupported dataset.name '{cfg.dataset.name}' for training. "
+        "Use a paired hazy/clear dataset such as 'Reside_OTS' or 'Paired'."
+    )
+
+
 def train(cfg, config_path: Optional[Path] = None):
     # --------------------------------------------------
     # 1) Device + Run Directories
@@ -101,12 +141,15 @@ def train(cfg, config_path: Optional[Path] = None):
     run_dir = os.path.join(cfg.model.save_path, run_name)
     checkpoint_root = str(OmegaConf.select(cfg, "training.checkpoint_root", default="./checkpoints"))
     ckpt_dir = os.path.join(checkpoint_root, run_name)
+    model_dir = os.path.join(run_dir, "models")
     out_dir = os.path.join(run_dir, "outputs")
     os.makedirs(ckpt_dir, exist_ok=True)
+    os.makedirs(model_dir, exist_ok=True)
     os.makedirs(out_dir, exist_ok=True)
 
     print(f"\nTraining on {device}")
     print(f"Run directory: {run_dir}\n")
+    print(f"Run model directory: {model_dir}\n")
     print(f"Checkpoint directory: {ckpt_dir}\n")
 
     # --------------------------------------------------
@@ -129,7 +172,11 @@ def train(cfg, config_path: Optional[Path] = None):
 
     model.apply(weights_init)
 
-    criterion = nn.MSELoss()
+    criterion = WeightedDehazeLoss(
+        mse_weight=float(OmegaConf.select(cfg, "training.loss.mse_weight", default=0.0)),
+        l1_weight=float(OmegaConf.select(cfg, "training.loss.l1_weight", default=1.0)),
+        ssim_weight=float(OmegaConf.select(cfg, "training.loss.ssim_weight", default=0.1)),
+    )
     optimizer = optim.Adam(
         model.parameters(),
         lr=cfg.training.lr,
@@ -156,7 +203,7 @@ def train(cfg, config_path: Optional[Path] = None):
         ]
     )
 
-    dataset = ResideOTS(cfg, transforms=transform)
+    dataset = _select_training_dataset(cfg, transform)
     if cfg.dataset.subset:
         dataset = Subset(dataset, range(cfg.dataset.subset))
 
@@ -239,10 +286,10 @@ def train(cfg, config_path: Optional[Path] = None):
     best_score = float("-inf")
     best_early_stopping_score = float("-inf")
     early_stopping_wait = 0
-    best_path = os.path.join(ckpt_dir, "best_model.pth")
-    best_psnr_path = os.path.join(ckpt_dir, "best_psnr_model.pth")
-    best_map50_path = os.path.join(ckpt_dir, "best_map50_model.pth")
-    last_path = os.path.join(ckpt_dir, "last_model.pth")
+    best_path = os.path.join(model_dir, "best_model.pth")
+    best_psnr_path = os.path.join(model_dir, "best_psnr_model.pth")
+    best_map50_path = os.path.join(model_dir, "best_map50_model.pth")
+    last_path = os.path.join(model_dir, "last_model.pth")
 
     epoch_bar = tqdm(
         range(cfg.training.epochs),
@@ -260,7 +307,8 @@ def train(cfg, config_path: Optional[Path] = None):
         train_loss = 0.0
 
         for hazy, clear in train_loader:
-            hazy, clear = hazy.to(device, non_blocking=True), clear.to(device, non_blocking=True)
+            hazy = hazy.to(device, non_blocking=True)
+            clear = clear.to(device, non_blocking=True)
 
             optimizer.zero_grad()
             prediction = model(hazy)

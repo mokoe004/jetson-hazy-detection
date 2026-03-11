@@ -30,6 +30,7 @@ class RTTSDataset(Dataset):
             'bicycle': 2,
             'car': 3,
             'motorcycle': 4,
+            'motorbike': 4,
             'bus': 5
         }
 

@@ -1,12 +1,14 @@
 # train_tinydehaze.yaml
 dataset:
-  name: "Reside_OTS" # options: Reside_OTS | Paired (alias: PairedDataset)
-  root: "./datasets/RESIDE-OTS" # Root des Datensatzes
+  #name: "Reside_OTS" # options: Reside_OTS | Paired (alias: PairedDataset)
+  #root: "./datasets/RESIDE-OTS" # Root des Datensatzes
+  name: "RTTS"
+  root: "./datasets/RTTS/RTTS"
   hazy_path: "hazy-part2" # nur fuer Reside_OTS
   clear_path: "clear" # nur fuer Reside_OTS
   img_size: 256 # Resize auf (img_size, img_size)
-  return_bboxes: false # fuer Dehazing-Training i.d.R. false
-  subset: 500 # int fuer Teilmenge, oder false fuer kompletten Datensatz
+  return_bboxes: true # fuer Dehazing-Training i.d.R. false
+  subset: false # int fuer Teilmenge, oder false fuer kompletten Datensatz
 
 training:
   device: "cuda" # cuda | cpu
@@ -17,7 +19,7 @@ training:
   num_workers: 0
   checkpoint_root: "./checkpoints" # Ordner fuer best/last/epoch_XXX Checkpoints
   selection_metric: "hybrid" # options: psnr | map50 | hybrid (speichert zusaetzlich best_psnr/best_map50)
-  od_eval_every: 10 # nur relevant fuer map50/hybrid
+  od_eval_every: 5 # nur relevant fuer map50/hybrid
   od_eval_subset: 100 # RTTS-Subset fuer OD-Eval waehrend Training
   alpha_latency: 0.001 # nur fuer hybrid: score = map50 - alpha * avg_dehaze_ms
   perf_batches: 10 # Anzahl Batches fuer Dehaze-Latenzmessung pro Epoche
@@ -29,6 +31,9 @@ training:
 
 model:
   name: "AODNetDepthwiseSpatial" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
+  sigma_scale: 0.3
+  heatmap_augmentation: true
+  alpha_init: 0.5
   base_channels: 8 # nur fuer TinyDehazeNet relevant
   save_path: "./runs/AODNetDepthwiseSpatial" # Run-Ordner fuer Logs/Outputs
 
@@ -48,4 +53,5 @@ evaluation_od:
   batch_size: 1
   num_workers: 0
   pin_memory: true
-  dehazer_input_size: 224 # false oder int (z.B. 224/256/512)
+  dehazer_input_size: 256 # false oder int (z.B. 224/256/512)
+  dehazer_checkpoint_path: "runs/AODNetDepthwiseGaussian/run_2026_03_11_22_33_07/models/best_map50_model.pth"

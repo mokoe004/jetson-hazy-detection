@@ -13,14 +13,14 @@ training:
   num_workers: 0
 
 model:
-  name: "TinyDehazeNet" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
+  name: "AODNetDepthwiseSpatial" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
   base_channels: 8 # relevant for TinyDehazeNet
 
 evaluation:
   device: "cuda" # fallback to cpu if cuda is unavailable
   #checkpoint_path: "./pretrained_models/AOD-Net/epoch3_full_OTS_subset.pth" # required
-  checkpoint_path: "./runs/tinydehaze/run_2026_03_08_03_21_08/models/last_model.pth"
-  save_path: "./runs/eval/AODNet" # output root for eval runs
+  checkpoint_path: "runs/AODNetDepthwiseSpatial/run_2026_03_08_23_50_46/models/best_map50_model.pth"
+  save_path: "./runs/eval/AODNetDepthwiseSpatial" # output root for eval runs
   split: "full" # val | train | full
   val_split: 0.2 # only used when split is val or train
   seed: 42 # random split seed

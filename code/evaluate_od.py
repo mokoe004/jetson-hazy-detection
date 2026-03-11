@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 from typing import List
 
@@ -16,8 +17,8 @@ from tqdm import tqdm
 
 from datasets import RTTSDataset, rtts_collate_fn
 from detectors import YOLOv8Adapter
-from evaluation.od_metrics import EvalSample, evaluate_detection
-from utils import load_pretrained_dehazer
+from evaluation.od_metrics import EvalSample, evaluate_detection, evaluate_detection_per_class
+from utils import load_pretrained_dehazer, visualize_random_od_predictions
 
 
 def _build_rtts_loader(cfg: DictConfig):
@@ -79,9 +80,41 @@ def _build_detector(cfg: DictConfig):
     )
 
 
+def _remap_rtts_gt_labels_to_coco(gt_labels: torch.Tensor) -> torch.Tensor:
+    """Map RTTS internal class ids to COCO class ids used by pretrained YOLOv8.
+
+    RTTS ids in this project (see datasets.RTTSDataset.class_to_idx):
+      1=person, 2=bicycle, 3=car, 4=motorcycle, 5=bus
+
+    COCO ids used by YOLOv8n.pt:
+      0=person, 1=bicycle, 2=car, 3=motorcycle, 5=bus
+    """
+    rtts_to_coco = {
+        1: 0,  # person
+        2: 1,  # bicycle
+        3: 2,  # car
+        4: 3,  # motorcycle
+        5: 5,  # bus
+    }
+
+    out = gt_labels.clone().to(torch.int64)
+    unique_ids = set(int(v) for v in torch.unique(out).tolist())
+    unknown = sorted(v for v in unique_ids if v not in rtts_to_coco)
+    if unknown:
+        raise ValueError(
+            f"Found RTTS labels without COCO remap: {unknown}. "
+            "Update _remap_rtts_gt_labels_to_coco mapping."
+        )
+
+    for src_id, dst_id in rtts_to_coco.items():
+        out[out == src_id] = dst_id
+    return out
+
+
 def _to_eval_sample(pred, target, image_id: int) -> EvalSample:
     gt_boxes = target["boxes"].detach().cpu().to(torch.float32)
     gt_labels = target["labels"].detach().cpu().to(torch.int64)
+    gt_labels = _remap_rtts_gt_labels_to_coco(gt_labels)
     return EvalSample(
         pred_boxes=pred.boxes,
         pred_scores=pred.scores,
@@ -182,16 +215,55 @@ def run_od_evaluation(cfg: DictConfig, config_path: Path) -> dict:
     with open(run_dir / "metrics.json", "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
 
+    # Save transparent class-wise diagnostics to verify label alignment and per-class quality.
+    gt_counter = Counter()
+    pred_counter = Counter()
+    for s in samples:
+        gt_counter.update(int(v) for v in s.gt_labels.tolist())
+        pred_counter.update(int(v) for v in s.pred_labels.tolist())
+
+    per_class = evaluate_detection_per_class(samples, iou_thr=0.5)
+    yolo_names = getattr(detector.model, "names", {})
+    label_debug = {
+        "gt_label_histogram": {str(k): int(v) for k, v in sorted(gt_counter.items())},
+        "pred_label_histogram": {str(k): int(v) for k, v in sorted(pred_counter.items())},
+        "per_class_metrics_iou50": {},
+    }
+    for class_id, cls_metrics in per_class.items():
+        class_name = yolo_names.get(class_id, f"class_{class_id}") if isinstance(yolo_names, dict) else f"class_{class_id}"
+        label_debug["per_class_metrics_iou50"][str(class_id)] = {
+            "class_name": class_name,
+            **cls_metrics,
+        }
+
+    with open(run_dir / "label_debug.json", "w", encoding="utf-8") as f:
+        json.dump(label_debug, f, indent=2)
+
     with open(run_dir / "metrics.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(metrics.keys()))
         writer.writeheader()
         writer.writerow(metrics)
+
+    viz_enabled = bool(OmegaConf.select(cfg, "evaluation_od.visualization.enabled", default=False))
+    if viz_enabled:
+        viz_num_samples = int(OmegaConf.select(cfg, "evaluation_od.visualization.num_samples", default=12))
+        viz_score_thr = float(OmegaConf.select(cfg, "detector.conf", default=0.25))
+        viz_seed = int(OmegaConf.select(cfg, "evaluation_od.visualization.seed", default=42))
+        viz_dir = run_dir / "visualizations"
+        visualize_random_od_predictions(
+            cfg=cfg,
+            num_samples=viz_num_samples,
+            score_thr=viz_score_thr,
+            seed=viz_seed,
+            save_dir=str(viz_dir),
+        )
 
     print("\n===== OD Evaluation Finished =====")
     print(f"Precision: {metrics['precision']:.4f}")
     print(f"Recall: {metrics['recall']:.4f}")
     print(f"mAP@0.5: {metrics['map50']:.4f}")
     print(f"mAP@0.5:0.95: {metrics['map50_95']:.4f}")
+    print("Saved class diagnostics to: label_debug.json")
     print(f"Run saved to: {run_dir}")
     return metrics
 
