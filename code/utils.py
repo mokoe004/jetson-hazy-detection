@@ -6,6 +6,7 @@ import pickle
 import json
 import random
 import time
+from typing import Optional, Union
 
 import cv2
 import numpy as np
@@ -84,7 +85,7 @@ def load_pretrained_dehazer(
     cfg,
     device: torch.device,
     checkpoint_path: str,
-    project_root: str | Path | None = None,
+    project_root: Optional[Union[str, Path]] = None,
     strict: bool = True,
     print_info: bool = True,
 ):
@@ -126,7 +127,7 @@ def visualize_random_od_predictions(
     num_samples: int = 12,
     score_thr: float = 0.25,
     seed: int = 42,
-    save_dir: str | None = None,
+    save_dir: Optional[str] = None,
 ):
     """Visualize random RTTS samples with GT and YOLOv8 predictions.
 
