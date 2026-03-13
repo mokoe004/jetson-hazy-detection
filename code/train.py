@@ -19,7 +19,7 @@ from evaluation.evaluation import calculate_psnr_ssim
 from evaluation.ssim_psnr_eval import ssim
 from omegaconf import OmegaConf
 
-from utils import print_model_info, cfg_select_model
+from utils import print_model_info, cfg_select_model, run_dehazer
 
 
 def configure_realtime_logging():
@@ -77,7 +77,7 @@ def _measure_dehaze_perf_ms(model, dataloader, device, max_batches: int = 10):
             if device.type == "cuda":
                 torch.cuda.synchronize()
             t0 = time.perf_counter()
-            _ = model(hazy)
+            _ = run_dehazer(model, hazy)
             if device.type == "cuda":
                 torch.cuda.synchronize()
             timings_ms.append((time.perf_counter() - t0) * 1000.0)
@@ -311,7 +311,7 @@ def train(cfg, config_path: Optional[Path] = None):
             clear = clear.to(device, non_blocking=True)
 
             optimizer.zero_grad()
-            prediction = model(hazy)
+            prediction = run_dehazer(model, hazy)
             loss = criterion(prediction, clear)
             loss.backward()
 

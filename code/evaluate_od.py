@@ -18,7 +18,7 @@ from tqdm import tqdm
 from datasets import RTTSDataset, rtts_collate_fn
 from detectors import YOLOv8Adapter
 from evaluation.od_metrics import EvalSample, evaluate_detection, evaluate_detection_per_class
-from utils import load_pretrained_dehazer, visualize_random_od_predictions
+from utils import load_pretrained_dehazer, run_dehazer, visualize_random_od_predictions
 
 
 def _build_rtts_loader(cfg: DictConfig):
@@ -180,7 +180,7 @@ def run_od_evaluation(cfg: DictConfig, config_path: Path) -> dict:
                     )
 
                 if use_dehazer:
-                    dehazed = dehazer(dehaze_input)
+                    dehazed = run_dehazer(dehazer, dehaze_input)
                     if dehazer_size:
                         dehazed = F.interpolate(
                             dehazed, size=(original_h, original_w), mode="bilinear", align_corners=False

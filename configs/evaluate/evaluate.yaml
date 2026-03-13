@@ -1,31 +1,31 @@
 dataset:
   name: "Reside_OTS" # options: Reside_OTS | Paired (alias: PairedDataset)
-  root: "./datasets/SOTS_outdoor" # dataset root folder
+  root: "./datasets/SOTS_indoor" # dataset root folder
   hazy_path: "hazy" # only used for Reside_OTS
   clear_path: "clear" # only used for Reside_OTS
   img_size: 256
   return_bboxes: false
-  subset: 500 # int limit, or false for full dataset
+  subset: false # int limit, or false for full dataset
 
 training:
   device: "cuda"
   batch_size: 2
-  num_workers: 0
+  num_workers: 2
 
 model:
-  name: "AODNetDepthwiseSpatial" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
+  name: "GCANet" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
   base_channels: 8 # relevant for TinyDehazeNet
 
 evaluation:
   device: "cuda" # fallback to cpu if cuda is unavailable
   #checkpoint_path: "./pretrained_models/AOD-Net/epoch3_full_OTS_subset.pth" # required
-  checkpoint_path: "runs/AODNetDepthwiseSpatial/run_2026_03_08_23_50_46/models/best_map50_model.pth"
-  save_path: "./runs/eval/AODNetDepthwiseSpatial" # output root for eval runs
+  checkpoint_path: "pretrained_models/GCA-Net/wacv_gcanet_dehaze.pth"
+  save_path: "./runs/eval/GCANet" # output root for eval runs
   split: "full" # val | train | full
   val_split: 0.2 # only used when split is val or train
   seed: 42 # random split seed
   batch_size: 2 # optional override (default: training.batch_size)
-  num_workers: 0 # optional override (default: training.num_workers)
+  num_workers: 2 # optional override (default: training.num_workers)
   pin_memory: true
   save_example: true # saves one comparison image in outputs/
   filename_prefix: "eval" # prefix for saved sample image

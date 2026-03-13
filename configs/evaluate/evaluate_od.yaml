@@ -6,20 +6,20 @@ dataset:
   subset: false
 
 model:
-  name: "AODNetDepthwiseSpatial" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
+  name: "GCANet" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
   base_channels: 8 # relevant for TinyDehazeNet
 
 evaluation_od:
   device: "cuda"
-  use_dehazer: False
+  use_dehazer: true
   #dehazer_checkpoint_path: "./pretrained_models/AOD-Net/epoch3_full_OTS_subset.pth"
-  dehazer_checkpoint_path: "runs/AODNetDepthwiseSpatial/run_2026_03_08_23_50_46/models/best_map50_model.pth"
-  save_path: "./runs/od_eval/AODNet_yolov8"
+  dehazer_checkpoint_path: "pretrained_models/GCA-Net/wacv_gcanet_dehaze.pth"
+  save_path: "./runs/od_eval/GCANet_yolov8"
   image_set: "test" # RTTS split file under ImageSets/Main/test.txt
-  batch_size: 1
-  num_workers: 0
+  batch_size: 2
+  num_workers: 2
   pin_memory: true
-  dehazer_input_size: false # set int (e.g. 512) to force fixed dehazer size
+  dehazer_input_size: 256 # set int (e.g. 512) to force fixed dehazer size
   visualization:
     enabled: True
     num_samples: 12
@@ -31,5 +31,5 @@ detector:
   device: "cuda:0"
   conf: 0.5
   iou: 0.5
-  imgsz: 640
+  imgsz: 512
   max_det: 300

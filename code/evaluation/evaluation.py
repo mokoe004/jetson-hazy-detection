@@ -14,7 +14,7 @@ from tqdm import tqdm
 from evaluation.ssim_psnr_eval import ssim, psnr
 from evaluation.jetson_benchmark import TegrastatsMonitor
 
-from utils import cfg_select_model
+from utils import cfg_select_model, run_dehazer
 
 def calculate_psnr_ssim(
     model,
@@ -53,7 +53,7 @@ def calculate_psnr_ssim(
             hazy = hazy.to(device, non_blocking=True)
             clear = clear.to(device, non_blocking=True)
 
-            prediction = model(hazy)
+            prediction = run_dehazer(model, hazy)
 
             total_psnr += psnr(prediction, clear)
             total_ssim += ssim(prediction, clear).item()
@@ -107,9 +107,9 @@ def run_benchmark(cfg):
         with torch.no_grad():
             if cfg.benchmark.use_fp16:
                 with torch.autocast(device_type=device.type):
-                    model(dummy)
+                    run_dehazer(model, dummy)
             else:
-                model(dummy)
+                run_dehazer(model, dummy)
 
     if device.type == "cuda":
         torch.cuda.synchronize()
@@ -131,9 +131,9 @@ def run_benchmark(cfg):
         with torch.no_grad():
             if cfg.benchmark.use_fp16:
                 with torch.autocast(device_type=device.type):
-                    model(dummy)
+                    run_dehazer(model, dummy)
             else:
-                model(dummy)
+                run_dehazer(model, dummy)
 
         if device.type == "cuda":
             torch.cuda.synchronize()
