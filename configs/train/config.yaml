@@ -29,8 +29,8 @@ training:
     metric: "selection_score" # options: selection_score | psnr
 
 model:
-  name: "LCANet" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
-  save_path: "./runs/lcanet" # Run-Ordner fuer Logs/Outputs
+  name: "AODNet" # options: AODNet | FFANet | LDNet | LFDNet | GCANet | TinyDehazeNet
+  save_path: "./runs/aodnet" # Run-Ordner fuer Logs/Outputs
 
 # Optional/erforderlich fuer selection_metric=map50 oder hybrid
 detector:
@@ -46,7 +46,7 @@ detector:
 # (train.py setzt use_dehazer/checkpoint automatisch)
 evaluation_od:
   device: "cuda" # cuda | cpu
-  save_path: "./runs/od_eval/lcanet_yolov8" # Zielordner fuer OD-Eval-Runs
+  save_path: "./runs/od_eval/aodnet_yolov8" # Zielordner fuer OD-Eval-Runs
   image_set: "test" # RTTS split file in ImageSets/Main
   batch_size: 1
   num_workers: 0

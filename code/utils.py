@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 from torchvision import transforms
 
-from models import AODNet, AODnetDepthwiseSpatial, AODnetDepthwiseGaussian, FFANet, LCANet, LDNet, LFDNet, GCANet, TinyDehazeNet
+from models import AODNet, AODnetDepthwiseSpatial, AODnetDepthwiseGaussian, FFANet, LDNet, LFDNet, GCANet, TinyDehazeNet
 
 def print_model_info(model):
     """
@@ -63,8 +63,6 @@ def cfg_select_model(cfg, device: str) -> nn.Module:
         ).to(torch_device)
     elif cfg.model.name == "FFANet":
         model = FFANet().to(torch_device)
-    elif cfg.model.name == "LCANet":
-        model = LCANet().to(torch_device)
     elif cfg.model.name == "LDNet":
         model = LDNet().to(torch_device)
     elif cfg.model.name == "LFDNet":

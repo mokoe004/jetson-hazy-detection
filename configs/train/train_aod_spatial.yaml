@@ -1,9 +1,9 @@
 # train_tinydehaze.yaml
 dataset:
-  #name: "Reside_OTS" # options: Reside_OTS | Paired (alias: PairedDataset)
-  #root: "./datasets/RESIDE-OTS" # Root des Datensatzes
-  name: "RTTS"
-  root: "./datasets/RTTS/RTTS"
+  name: "Reside_OTS" # options: Reside_OTS | Paired (alias: PairedDataset)
+  root: "./datasets/RESIDE-OTS" # Root des Datensatzes
+  #name: "RTTS"
+  #root: "./datasets/RTTS/RTTS"
   hazy_path: "hazy-part2" # nur fuer Reside_OTS
   clear_path: "clear" # nur fuer Reside_OTS
   img_size: 256 # Resize auf (img_size, img_size)
@@ -12,11 +12,11 @@ dataset:
 
 training:
   device: "cuda" # cuda | cpu
-  batch_size: 4
+  batch_size: 3
   lr: 0.0002
   weight_decay: 0.0
-  epochs: 30
-  num_workers: 0
+  epochs: 50
+  num_workers: 2
   checkpoint_root: "./checkpoints" # Ordner fuer best/last/epoch_XXX Checkpoints
   selection_metric: "hybrid" # options: psnr | map50 | hybrid (speichert zusaetzlich best_psnr/best_map50)
   od_eval_every: 5 # nur relevant fuer map50/hybrid
@@ -30,7 +30,7 @@ training:
     metric: "selection_score" # options: selection_score | psnr
 
 model:
-  name: "AODNetDepthwiseSpatial" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
+  name: "AODNetDepthwiseSpatial" # options: AODNet | FFANet | LDNet | LFDNet | GCANet | TinyDehazeNet
   sigma_scale: 0.3
   heatmap_augmentation: true
   alpha_init: 0.5
@@ -54,4 +54,4 @@ evaluation_od:
   num_workers: 0
   pin_memory: true
   dehazer_input_size: 256 # false oder int (z.B. 224/256/512)
-  dehazer_checkpoint_path: "runs/AODNetDepthwiseGaussian/run_2026_03_11_22_33_07/models/best_map50_model.pth"
+  #dehazer_checkpoint_path: "runs/AODNetDepthwiseGaussian/run_2026_03_11_22_33_07/models/best_map50_model.pth"

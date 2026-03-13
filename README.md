@@ -4,7 +4,7 @@ PyTorch-based dehazing project for low-visibility scenes, with training on paire
 
 ## Features
 
-- Multiple dehazing backbones: `AODnet`, `FFANet`, `LCANet`, `LDNet`, `LDFNet`
+- Multiple dehazing backbones: `AODNet`, `FFANet`, `LDNet`, `LFDNet`, `GCANet`, `TinyDehazeNet`
 - Config-driven training with YAML (`OmegaConf`)
 - Validation metrics: PSNR and SSIM
 - Object detection evaluation after dehazing (`precision`, `recall`, `mAP@0.5`, `mAP@0.5:0.95`)
@@ -86,7 +86,6 @@ python code/train.py --config configs/train/train_aodnet.yaml
 
 Other ready-to-use configs:
 - `configs/train/train_ffanet.yaml`
-- `configs/train/train_lcanet.yaml`
 - `configs/train/train_ldnet.yaml`
 - `configs/train/train_lfdnet.yaml`
 
@@ -138,5 +137,5 @@ Results are saved to `runs/od_eval/.../run_YYYY_MM_DD_HH_MM_SS/`:
 
 ## Notes
 
-- Use exact model names from `code/utils.py` in configs: `AODnet`, `FFANet`, `LCANet`, `LDNet`, `LDFNet`.
+- Use exact model names from `code/utils.py` in configs: `AODNet`, `AODNetDepthwiseSpatial`, `AODNetDepthwiseGaussian`, `FFANet`, `LDNet`, `LFDNet`, `GCANet`, `TinyDehazeNet`.
 - `yolov5_annotations.py` and `yolov8_annotations.py` are helper templates and require path/model adaptation before use.

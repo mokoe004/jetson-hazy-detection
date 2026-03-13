@@ -6,7 +6,7 @@ dataset:
   subset: false
 
 model:
-  name: "GCANet" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
+  name: "GCANet" # options: AODNet | FFANet | LDNet | LFDNet | GCANet | TinyDehazeNet
   base_channels: 8 # relevant for TinyDehazeNet
 
 evaluation_od:

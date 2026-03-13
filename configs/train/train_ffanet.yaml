@@ -28,7 +28,7 @@ training:
     metric: "selection_score" # options: selection_score | psnr
 
 model:
-  name: "FFANet" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
+  name: "FFANet" # options: AODNet | FFANet | LDNet | LFDNet | GCANet | TinyDehazeNet
   save_path: "./runs/ffanet" # Run-Ordner fuer Logs/Outputs
 
 detector:
