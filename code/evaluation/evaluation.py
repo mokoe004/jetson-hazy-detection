@@ -43,7 +43,7 @@ def calculate_psnr_ssim(
 
     total_psnr = 0.0
     total_ssim = 0.0
-    num_batches = 0
+    num_images = 0
 
     if out_dir is not None:
         os.makedirs(out_dir, exist_ok=True)
@@ -55,9 +55,12 @@ def calculate_psnr_ssim(
 
             prediction = run_dehazer(model, hazy)
 
-            total_psnr += psnr(prediction, clear)
-            total_ssim += ssim(prediction, clear).item()
-            num_batches += 1
+            batch_psnr = psnr(prediction, clear, reduction="none")
+            batch_ssim = ssim(prediction, clear, size_average=False)
+
+            total_psnr += float(np.sum(batch_psnr))
+            total_ssim += float(batch_ssim.sum().item())
+            num_images += int(prediction.shape[0])
 
             # Erstes Batch speichern
             if save_example and i == 5 and out_dir is not None:
@@ -69,8 +72,8 @@ def calculate_psnr_ssim(
                     os.path.join(out_dir, f"{filename_prefix}_example.png")
                 )
 
-    avg_psnr = total_psnr / max(1, num_batches)
-    avg_ssim = total_ssim / max(1, num_batches)
+    avg_psnr = total_psnr / max(1, num_images)
+    avg_ssim = total_ssim / max(1, num_images)
 
     return avg_psnr, avg_ssim
 

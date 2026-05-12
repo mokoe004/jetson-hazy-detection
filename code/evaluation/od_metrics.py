@@ -46,6 +46,15 @@ def _compute_ap(recall: np.ndarray, precision: np.ndarray) -> float:
     return float(np.sum((mrec[idx + 1] - mrec[idx]) * mpre[idx + 1]))
 
 
+def _collect_class_ids(samples: List[EvalSample]) -> Tuple[List[int], List[int]]:
+    gt_class_ids = set()
+    pred_class_ids = set()
+    for s in samples:
+        gt_class_ids.update(int(v) for v in s.gt_labels.tolist())
+        pred_class_ids.update(int(v) for v in s.pred_labels.tolist())
+    return sorted(gt_class_ids), sorted(pred_class_ids)
+
+
 def _class_ap_at_iou(samples: List[EvalSample], class_id: int, iou_thr: float) -> Tuple[float, int, int, int]:
     gt_by_image: Dict[int, torch.Tensor] = {}
     matched_by_image: Dict[int, torch.Tensor] = {}
@@ -67,7 +76,7 @@ def _class_ap_at_iou(samples: List[EvalSample], class_id: int, iou_thr: float) -
             preds.append((float(score.item()), s.image_id, box))
 
     if total_gt == 0:
-        return float("nan"), 0, 0, 0
+        return float("nan"), 0, len(preds), 0
 
     preds.sort(key=lambda x: x[0], reverse=True)
     if len(preds) == 0:
@@ -110,11 +119,8 @@ def evaluate_detection(
     if iou_thresholds is None:
         iou_thresholds = [round(x, 2) for x in np.arange(0.5, 1.0, 0.05)]
 
-    class_ids = set()
-    for s in samples:
-        class_ids.update(s.gt_labels.tolist())
-        class_ids.update(s.pred_labels.tolist())
-    class_ids = sorted(int(c) for c in class_ids)
+    gt_class_ids, pred_class_ids = _collect_class_ids(samples)
+    class_ids = gt_class_ids if len(gt_class_ids) > 0 else pred_class_ids
 
     if len(class_ids) == 0:
         return {
@@ -124,6 +130,8 @@ def evaluate_detection(
             "map50_95": 0.0,
             "num_images": float(len(samples)),
             "num_classes_observed": 0.0,
+            "num_gt_classes_observed": 0.0,
+            "num_pred_classes_observed": 0.0,
         }
 
     map_per_thr = []
@@ -167,18 +175,21 @@ def evaluate_detection(
         "map50_95": map50_95,
         "num_images": float(len(samples)),
         "num_classes_observed": float(len(class_ids)),
+        "num_gt_classes_observed": float(len(gt_class_ids)),
+        "num_pred_classes_observed": float(len(pred_class_ids)),
     }
 
 
 def evaluate_detection_per_class(
     samples: List[EvalSample],
     iou_thr: float = 0.5,
+    include_pred_only: bool = False,
 ) -> Dict[int, Dict[str, float]]:
-    class_ids = set()
-    for s in samples:
-        class_ids.update(int(v) for v in s.gt_labels.tolist())
-        class_ids.update(int(v) for v in s.pred_labels.tolist())
-    class_ids = sorted(class_ids)
+    gt_class_ids, pred_class_ids = _collect_class_ids(samples)
+    if include_pred_only:
+        class_ids = sorted(set(gt_class_ids) | set(pred_class_ids))
+    else:
+        class_ids = list(gt_class_ids)
 
     per_class: Dict[int, Dict[str, float]] = {}
     for class_id in class_ids:

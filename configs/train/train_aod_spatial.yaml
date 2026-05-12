@@ -1,4 +1,4 @@
-# train_tinydehaze.yaml
+# train_aod_spatial.yaml
 dataset:
   name: "Reside_OTS" # options: Reside_OTS | Paired (alias: PairedDataset)
   root: "./datasets/RESIDE-OTS" # Root des Datensatzes
@@ -7,7 +7,7 @@ dataset:
   hazy_path: "hazy-part2" # nur fuer Reside_OTS
   clear_path: "clear" # nur fuer Reside_OTS
   img_size: 256 # Resize auf (img_size, img_size)
-  return_bboxes: true # fuer Dehazing-Training i.d.R. false
+  return_bboxes: false # fuer Dehazing-Training i.d.R. false
   subset: false # int fuer Teilmenge, oder false fuer kompletten Datensatz
 
 training:
@@ -28,14 +28,32 @@ training:
     patience: 5
     min_delta: 0.0
     metric: "selection_score" # options: selection_score | psnr
+  loss:
+    mse_weight: 0.0
+    l1_weight: 1.0
+    ssim_weight: 0.1
 
 model:
   name: "AODNetDepthwiseSpatial" # options: AODNet | FFANet | LDNet | LFDNet | GCANet | TinyDehazeNet
-  sigma_scale: 0.3
+  base_channels: 6
+  attention_variant: "od_guided" # legacy_gaussian | od_guided | hybrid | none
+  num_attention_peaks: 4
+  use_input_edge: true
+  use_channel_gate: true
+  channel_gate_reduction: 8
+  spatial_hidden_channels: 8
+  sigma_scale: 0.4
   heatmap_augmentation: true
-  alpha_init: 0.5
-  base_channels: 8 # nur fuer TinyDehazeNet relevant
+  alpha_init: 0.35
   save_path: "./runs/AODNetDepthwiseSpatial" # Run-Ordner fuer Logs/Outputs
+
+  # Ablation examples:
+  # legacy baseline:  base_channels=3, attention_variant=legacy_gaussian, num_attention_peaks=1,
+  #                   use_input_edge=false, use_channel_gate=false
+  # guided small:     base_channels=3, attention_variant=od_guided, num_attention_peaks=4,
+  #                   use_input_edge=true, use_channel_gate=false
+  # guided best mini: base_channels=6, attention_variant=od_guided, num_attention_peaks=4,
+  #                   use_input_edge=true, use_channel_gate=true
 
 detector:
   name: "yolov8" # aktuell nur yolov8 unterstuetzt

@@ -36,13 +36,27 @@ def cfg_select_model(cfg, device: str) -> nn.Module:
     if cfg.model.name == "AODNet":
         model = AODNet().to(torch_device)
     elif cfg.model.name == "AODNetDepthwiseSpatial":
+        base_channels = int(getattr(cfg.model, "base_channels", 3))
         sigma_scale = float(getattr(cfg.model, "sigma_scale", 0.3))
         heatmap_augmentation = bool(getattr(cfg.model, "heatmap_augmentation", True))
         alpha_init = float(getattr(cfg.model, "alpha_init", 0.5))
+        attention_variant = str(getattr(cfg.model, "attention_variant", "legacy_gaussian"))
+        num_attention_peaks = int(getattr(cfg.model, "num_attention_peaks", 1))
+        use_input_edge = bool(getattr(cfg.model, "use_input_edge", True))
+        use_channel_gate = bool(getattr(cfg.model, "use_channel_gate", False))
+        channel_gate_reduction = int(getattr(cfg.model, "channel_gate_reduction", 8))
+        spatial_hidden_channels = getattr(cfg.model, "spatial_hidden_channels", None)
         model = AODnetDepthwiseSpatial(
+            base_channels=base_channels,
             sigma_scale=sigma_scale,
             heatmap_augmentation=heatmap_augmentation,
             alpha_init=alpha_init,
+            attention_variant=attention_variant,
+            num_attention_peaks=num_attention_peaks,
+            use_input_edge=use_input_edge,
+            use_channel_gate=use_channel_gate,
+            channel_gate_reduction=channel_gate_reduction,
+            spatial_hidden_channels=spatial_hidden_channels,
         ).to(torch_device)
     elif cfg.model.name == "AODNetDepthwiseGaussian":
         base_channels = int(getattr(cfg.model, "base_channels", 3))
@@ -311,7 +325,7 @@ def visualize_random_od_predictions(
             else:
                 dehazed = dehaze_input
 
-            dehazed = dehazed.clamp(0.0, 1.0).squeeze(0).cpu()
+            dehazed = dehazed.clamp(0.0, 1.0).squeeze(0)
             pred = detector.predict([dehazed])[0]
 
             gt_boxes = target["boxes"].detach().cpu().to(torch.float32)

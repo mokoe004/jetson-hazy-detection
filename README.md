@@ -130,10 +130,53 @@ Default setup uses:
 - dehazing checkpoint from `evaluation_od.dehazer_checkpoint_path`
 - YOLOv8 detector from `detector.weights`
 
+The detector path supports both:
+- PyTorch weights like `yolov8n.pt`
+- TensorRT engines like `yolov8n.engine`
+
+The OD pipeline now performs detector warmup before timing and synchronizes CUDA work before measuring latency, so `avg_detect_ms` is suitable for PyTorch CUDA vs TensorRT comparisons.
+
 Results are saved to `runs/od_eval/.../run_YYYY_MM_DD_HH_MM_SS/`:
 - `metrics.json`
 - `metrics.csv`
 - `run_config.yaml`
+
+Useful timing fields in `metrics.json`:
+- `avg_dehaze_ms`
+- `avg_detect_ms`
+- `avg_pipeline_ms`
+- `pipeline_fps`
+- `detector_backend_actual`
+- `detector_fp16_runtime`
+
+### Export YOLOv8 to TensorRT
+
+Run this on the Jetson / TensorRT-capable environment where you want to deploy:
+
+```bash
+python code/export_yolo_tensorrt.py --config configs/evaluate/evaluate_od.yaml --device 0 --half
+```
+
+Then point `detector.weights` in your eval config to the exported `.engine` file.
+
+Example TensorRT config:
+- `configs/evaluate/evaluate_od_tensorrt.yaml`
+
+### Compare PyTorch CUDA vs TensorRT
+
+Run the same OD pipeline twice and save a comparison summary:
+
+```bash
+python code/compare_od_configs.py \
+  --baseline-config configs/evaluate/evaluate_od.yaml \
+  --candidate-config configs/evaluate/evaluate_od_tensorrt.yaml
+```
+
+This writes a summary under `runs/od_compare/...` including:
+- detector latency improvement
+- detector speedup factor
+- end-to-end pipeline speedup
+- `mAP` / precision / recall deltas
 
 ## Notes
 

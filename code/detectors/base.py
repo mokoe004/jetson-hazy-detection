@@ -17,3 +17,8 @@ class DetectorAdapter:
     def predict(self, images: List[torch.Tensor]) -> List[DetectionBatch]:
         raise NotImplementedError
 
+    def synchronize(self) -> None:
+        return None
+
+    def runtime_info(self) -> dict:
+        return {}

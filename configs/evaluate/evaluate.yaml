@@ -1,6 +1,6 @@
 dataset:
   name: "Reside_OTS" # options: Reside_OTS | Paired (alias: PairedDataset)
-  root: "./datasets/SOTS_indoor" # dataset root folder
+  root: "./datasets/SOTS_outdoor" # dataset root folder
   hazy_path: "hazy" # only used for Reside_OTS
   clear_path: "clear" # only used for Reside_OTS
   img_size: 256
@@ -13,14 +13,14 @@ training:
   num_workers: 2
 
 model:
-  name: "GCANet" # options: AODNet | FFANet | LDNet | LFDNet | GCANet | TinyDehazeNet
+  name: "LDNet" # options: AODNet | FFANet | LDNet | LFDNet | GCANet | TinyDehazeNet
   base_channels: 8 # relevant for TinyDehazeNet
 
 evaluation:
   device: "cuda" # fallback to cpu if cuda is unavailable
   #checkpoint_path: "./pretrained_models/AOD-Net/epoch3_full_OTS_subset.pth" # required
-  checkpoint_path: "pretrained_models/GCA-Net/wacv_gcanet_dehaze.pth"
-  save_path: "./runs/eval/GCANet" # output root for eval runs
+  checkpoint_path: 'pretrained_models\LD-Net\trained_LDNet.pth'
+  save_path: "./runs/eval/LDNet" # output root for eval runs
   split: "full" # val | train | full
   val_split: 0.2 # only used when split is val or train
   seed: 42 # random split seed

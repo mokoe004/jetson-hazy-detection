@@ -442,6 +442,20 @@ def train(cfg, config_path: Optional[Path] = None):
     print(f"CSV log:   {csv_path}")
     print(f"Last:      {last_path}")
     print(f"Outputs:   {out_dir}")
+    return {
+        "run_dir": run_dir,
+        "model_dir": model_dir,
+        "output_dir": out_dir,
+        "csv_path": csv_path,
+        "best_model_path": best_path,
+        "best_psnr_model_path": best_psnr_path,
+        "best_map50_model_path": best_map50_path if best_map50 > float("-inf") else None,
+        "last_model_path": last_path,
+        "best_psnr": float(best_psnr),
+        "best_map50": None if best_map50 == float("-inf") else float(best_map50),
+        "best_selection_score": float(best_score),
+        "selection_metric": selection_metric,
+    }
 
 
 def parse_args():

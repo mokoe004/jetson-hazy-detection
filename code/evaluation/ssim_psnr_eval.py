@@ -19,7 +19,6 @@ Expected tensor format:
 """
 
 from math import exp
-import math
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -181,7 +180,11 @@ def ssim(
     return _ssim(img1, img2, window, window_size, channel, size_average)
 
 
-def psnr(pred: torch.Tensor, gt: torch.Tensor) -> float:
+def psnr(
+    pred: torch.Tensor,
+    gt: torch.Tensor,
+    reduction: str = "mean",
+):
     """
     Computes Peak Signal-to-Noise Ratio (PSNR).
 
@@ -193,7 +196,9 @@ def psnr(pred: torch.Tensor, gt: torch.Tensor) -> float:
         gt (Tensor): Ground-truth image (B, C, H, W)
 
     Returns:
-        float: PSNR value in decibels (dB)
+        float | np.ndarray:
+            Mean PSNR in decibels when reduction="mean",
+            otherwise one PSNR value per image when reduction="none".
 
     Typical interpretation:
         < 20 dB  -> Poor
@@ -207,14 +212,23 @@ def psnr(pred: torch.Tensor, gt: torch.Tensor) -> float:
         - Assumes input range [0, 1].
     """
 
-    pred = pred.clamp(0, 1).cpu().numpy()
-    gt = gt.clamp(0, 1).cpu().numpy()
+    pred = pred.clamp(0, 1).detach().cpu().numpy()
+    gt = gt.clamp(0, 1).detach().cpu().numpy()
 
-    mse = np.mean((pred - gt) ** 2)
+    if pred.ndim == 3:
+        pred = np.expand_dims(pred, axis=0)
+        gt = np.expand_dims(gt, axis=0)
 
-    if mse == 0:
-        return 100.0
+    mse = np.mean((pred - gt) ** 2, axis=(1, 2, 3))
+    psnr_values = np.full_like(mse, 100.0, dtype=np.float64)
 
-    rmse = math.sqrt(mse)
+    non_zero = mse > 0
+    rmse = np.sqrt(mse[non_zero])
+    psnr_values[non_zero] = 20.0 * np.log10(1.0 / rmse)
 
-    return 20 * math.log10(1.0 / rmse)
+    if reduction == "mean":
+        return float(psnr_values.mean())
+    if reduction == "none":
+        return psnr_values
+
+    raise ValueError("reduction must be either 'mean' or 'none'.")

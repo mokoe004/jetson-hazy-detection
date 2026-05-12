@@ -6,30 +6,33 @@ dataset:
   subset: false
 
 model:
-  name: "GCANet" # options: AODNet | FFANet | LDNet | LFDNet | GCANet | TinyDehazeNet
+  name: "LFDNet" # options: AODNet | FFANet | LDNet | LFDNet | GCANet | TinyDehazeNet
   base_channels: 8 # relevant for TinyDehazeNet
 
 evaluation_od:
   device: "cuda"
   use_dehazer: true
   #dehazer_checkpoint_path: "./pretrained_models/AOD-Net/epoch3_full_OTS_subset.pth"
-  dehazer_checkpoint_path: "pretrained_models/GCA-Net/wacv_gcanet_dehaze.pth"
-  save_path: "./runs/od_eval/GCANet_yolov8"
+  dehazer_checkpoint_path: 'pretrained_models\LFD-Net\epoch_30_full_ots'
+  save_path: "./runs/od_eval/LFDNet_yolov8"
   image_set: "test" # RTTS split file under ImageSets/Main/test.txt
   batch_size: 2
   num_workers: 2
   pin_memory: true
+  warmup_runs: 3 # exclude one-time backend setup from timing comparisons
   dehazer_input_size: 256 # set int (e.g. 512) to force fixed dehazer size
   visualization:
     enabled: True
     num_samples: 12
     seed: 42
+    score_thr: 0.5
 
 detector:
   name: "yolov8"
-  weights: "./pretrained_models/YOLO/yolov8n.pt"
+  weights: "./pretrained_models/YOLO/yolov8n.pt" # swap to .engine for TensorRT runs
   device: "cuda:0"
-  conf: 0.5
+  conf: 0.001
   iou: 0.5
   imgsz: 512
   max_det: 300
+  half: false # set true if you want FP16 PyTorch CUDA as an additional baseline
