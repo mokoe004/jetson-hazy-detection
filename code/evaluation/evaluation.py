@@ -14,7 +14,7 @@ from tqdm import tqdm
 from evaluation.ssim_psnr_eval import ssim, psnr
 from evaluation.jetson_benchmark import TegrastatsMonitor
 
-from utils import cfg_select_model
+from utils import cfg_select_model, run_dehazer
 
 def calculate_psnr_ssim(
     model,
@@ -43,7 +43,7 @@ def calculate_psnr_ssim(
 
     total_psnr = 0.0
     total_ssim = 0.0
-    num_batches = 0
+    num_images = 0
 
     if out_dir is not None:
         os.makedirs(out_dir, exist_ok=True)
@@ -53,11 +53,14 @@ def calculate_psnr_ssim(
             hazy = hazy.to(device, non_blocking=True)
             clear = clear.to(device, non_blocking=True)
 
-            prediction = model(hazy)
+            prediction = run_dehazer(model, hazy)
 
-            total_psnr += psnr(prediction, clear)
-            total_ssim += ssim(prediction, clear).item()
-            num_batches += 1
+            batch_psnr = psnr(prediction, clear, reduction="none")
+            batch_ssim = ssim(prediction, clear, size_average=False)
+
+            total_psnr += float(np.sum(batch_psnr))
+            total_ssim += float(batch_ssim.sum().item())
+            num_images += int(prediction.shape[0])
 
             # Erstes Batch speichern
             if save_example and i == 5 and out_dir is not None:
@@ -69,8 +72,8 @@ def calculate_psnr_ssim(
                     os.path.join(out_dir, f"{filename_prefix}_example.png")
                 )
 
-    avg_psnr = total_psnr / max(1, num_batches)
-    avg_ssim = total_ssim / max(1, num_batches)
+    avg_psnr = total_psnr / max(1, num_images)
+    avg_ssim = total_ssim / max(1, num_images)
 
     return avg_psnr, avg_ssim
 
@@ -107,9 +110,9 @@ def run_benchmark(cfg):
         with torch.no_grad():
             if cfg.benchmark.use_fp16:
                 with torch.autocast(device_type=device.type):
-                    model(dummy)
+                    run_dehazer(model, dummy)
             else:
-                model(dummy)
+                run_dehazer(model, dummy)
 
     if device.type == "cuda":
         torch.cuda.synchronize()
@@ -131,9 +134,9 @@ def run_benchmark(cfg):
         with torch.no_grad():
             if cfg.benchmark.use_fp16:
                 with torch.autocast(device_type=device.type):
-                    model(dummy)
+                    run_dehazer(model, dummy)
             else:
-                model(dummy)
+                run_dehazer(model, dummy)
 
         if device.type == "cuda":
             torch.cuda.synchronize()

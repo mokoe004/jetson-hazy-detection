@@ -1,4 +1,4 @@
-# train_tinydehaze.yaml
+# train_aod_spatial.yaml
 dataset:
   name: "Reside_OTS" # options: Reside_OTS | Paired (alias: PairedDataset)
   root: "./datasets/RESIDE-OTS" # Root des Datensatzes
@@ -7,13 +7,11 @@ dataset:
   hazy_path: "hazy-part2" # nur fuer Reside_OTS
   clear_path: "clear" # nur fuer Reside_OTS
   img_size: 256 # Resize auf (img_size, img_size)
-  return_bboxes: true # fuer Dehazing-Training i.d.R. false
-  subset: 500 # int fuer Teilmenge, oder false fuer kompletten Datensatz
+  return_bboxes: false # fuer Dehazing-Training i.d.R. false
+  subset: false # int fuer Teilmenge, oder false fuer kompletten Datensatz
 
 training:
   device: "cuda" # cuda | cpu
-  seed: 42
-  deterministic: true
   batch_size: 3
   lr: 0.0002
   weight_decay: 0.0
@@ -29,16 +27,33 @@ training:
     enabled: false
     patience: 15
     min_delta: 0.0
-    metric: "psnr" # options: selection_score | psnr
+    metric: "selection_score" # options: selection_score | psnr
+  loss:
+    mse_weight: 0.0
+    l1_weight: 1.0
+    ssim_weight: 0.1
 
 model:
-  name: "AODNetDepthwiseSpatial" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
-  sigma_scale: 0.3
-  heatmap_augmentation: false
-  alpha_init: 0.5
-  use_spatial_attention: false
-  base_channels: 8 # nur fuer TinyDehazeNet relevant
+  name: "AODNetDepthwiseSpatial" # options: AODNet | FFANet | LDNet | LFDNet | GCANet | TinyDehazeNet
+  base_channels: 6
+  attention_variant: "od_guided" # legacy_gaussian | od_guided | hybrid | none
+  num_attention_peaks: 4
+  use_input_edge: true
+  use_channel_gate: true
+  channel_gate_reduction: 8
+  spatial_hidden_channels: 8
+  sigma_scale: 0.4
+  heatmap_augmentation: true
+  alpha_init: 0.35
   save_path: "./runs/AODNetDepthwiseSpatial" # Run-Ordner fuer Logs/Outputs
+
+  # Ablation examples:
+  # legacy baseline:  base_channels=3, attention_variant=legacy_gaussian, num_attention_peaks=1,
+  #                   use_input_edge=false, use_channel_gate=false
+  # guided small:     base_channels=3, attention_variant=od_guided, num_attention_peaks=4,
+  #                   use_input_edge=true, use_channel_gate=false
+  # guided best mini: base_channels=6, attention_variant=od_guided, num_attention_peaks=4,
+  #                   use_input_edge=true, use_channel_gate=true
 
 detector:
   name: "yolov8" # aktuell nur yolov8 unterstuetzt
@@ -57,4 +72,4 @@ evaluation_od:
   num_workers: 0
   pin_memory: true
   dehazer_input_size: 256 # false oder int (z.B. 224/256/512)
-  # dehazer_checkpoint_path: "runs/AODNetDepthwiseGaussian/run_2026_03_11_22_33_07/models/best_map50_model.pth"
+  #dehazer_checkpoint_path: "runs/AODNetDepthwiseGaussian/run_2026_03_11_22_33_07/models/best_map50_model.pth"

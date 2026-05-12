@@ -18,7 +18,7 @@ from tqdm import tqdm
 from datasets import RTTSDataset, rtts_collate_fn
 from detectors import YOLOv8Adapter
 from evaluation.od_metrics import EvalSample, evaluate_detection, evaluate_detection_per_class
-from utils import load_pretrained_dehazer, visualize_random_od_predictions
+from utils import load_pretrained_dehazer, run_dehazer, visualize_random_od_predictions
 
 
 def _build_rtts_loader(cfg: DictConfig):
@@ -56,6 +56,11 @@ def _dehaze_identity(image: torch.Tensor) -> torch.Tensor:
     return image
 
 
+def _synchronize_torch_device(device: torch.device) -> None:
+    if device.type == "cuda" and torch.cuda.is_available():
+        torch.cuda.synchronize(device)
+
+
 def _build_detector(cfg: DictConfig):
     detector_name = str(OmegaConf.select(cfg, "detector.name", default="yolov8")).lower()
     if detector_name != "yolov8":
@@ -70,13 +75,21 @@ def _build_detector(cfg: DictConfig):
         print("Warning: CUDA requested for detector but not available. Falling back to CPU.")
         detector_device = "cpu"
 
+    conf = float(OmegaConf.select(cfg, "detector.conf", default=0.25))
+    if conf > 0.1:
+        print(
+            f"Warning: detector.conf={conf:.3f} is high for AP evaluation and can suppress "
+            "low-confidence true positives. For mAP-style runs, values around 0.001-0.01 are safer."
+        )
+
     return YOLOv8Adapter(
         weights=str(weights),
         device=detector_device,
-        conf=float(OmegaConf.select(cfg, "detector.conf", default=0.25)),
+        conf=conf,
         iou=float(OmegaConf.select(cfg, "detector.iou", default=0.7)),
         imgsz=int(OmegaConf.select(cfg, "detector.imgsz", default=640)),
         max_det=int(OmegaConf.select(cfg, "detector.max_det", default=300)),
+        half=bool(OmegaConf.select(cfg, "detector.half", default=False)),
     )
 
 
@@ -125,6 +138,72 @@ def _to_eval_sample(pred, target, image_id: int) -> EvalSample:
     )
 
 
+def _run_dehaze_step(
+    image: torch.Tensor,
+    use_dehazer: bool,
+    dehazer,
+    dehazer_size,
+) -> torch.Tensor:
+    original_h, original_w = image.shape[-2:]
+    dehaze_input = image
+    if use_dehazer and dehazer_size:
+        size = int(dehazer_size)
+        dehaze_input = F.interpolate(
+            image,
+            size=(size, size),
+            mode="bilinear",
+            align_corners=False,
+        )
+
+    if use_dehazer:
+        dehazed = run_dehazer(dehazer, dehaze_input)
+        if dehazer_size:
+            dehazed = F.interpolate(
+                dehazed,
+                size=(original_h, original_w),
+                mode="bilinear",
+                align_corners=False,
+            )
+    else:
+        dehazed = _dehaze_identity(dehaze_input)
+
+    return dehazed.clamp(0.0, 1.0).squeeze(0)
+
+
+def _warmup_pipeline(
+    cfg: DictConfig,
+    loader: DataLoader,
+    device: torch.device,
+    use_dehazer: bool,
+    dehazer,
+    detector,
+    dehazer_size,
+) -> int:
+    warmup_runs = int(OmegaConf.select(cfg, "evaluation_od.warmup_runs", default=3))
+    if warmup_runs <= 0 or len(loader.dataset) == 0:
+        return 0
+
+    warmup_sample = loader.dataset[0]
+    warmup_image = warmup_sample[0] if isinstance(warmup_sample, (tuple, list)) else warmup_sample
+    warmup_image = warmup_image.to(device).unsqueeze(0)
+
+    with torch.no_grad():
+        for _ in range(warmup_runs):
+            _synchronize_torch_device(device)
+            dehazed = _run_dehaze_step(
+                image=warmup_image,
+                use_dehazer=use_dehazer,
+                dehazer=dehazer,
+                dehazer_size=dehazer_size,
+            )
+            _synchronize_torch_device(device)
+            detector.synchronize()
+            detector.predict([dehazed])
+            detector.synchronize()
+
+    return warmup_runs
+
+
 def run_od_evaluation(cfg: DictConfig, config_path: Path) -> dict:
     project_root = Path(__file__).resolve().parents[1]
     device_str = str(OmegaConf.select(cfg, "evaluation_od.device", default="cuda"))
@@ -163,42 +242,45 @@ def run_od_evaluation(cfg: DictConfig, config_path: Path) -> dict:
     dehaze_times = []
     detect_times = []
     dehazer_size = OmegaConf.select(cfg, "evaluation_od.dehazer_input_size", default=False)
+    warmup_runs = _warmup_pipeline(
+        cfg=cfg,
+        loader=loader,
+        device=device,
+        use_dehazer=use_dehazer,
+        dehazer=dehazer,
+        detector=detector,
+        dehazer_size=dehazer_size,
+    )
 
     with torch.no_grad():
         image_counter = 0
         for images, targets in tqdm(loader, desc="OD Eval"):
             for image, target in zip(images, targets):
                 image = image.to(device, non_blocking=True).unsqueeze(0)
-                original_h, original_w = image.shape[-2:]
-
+                _synchronize_torch_device(device)
                 t0 = time.perf_counter()
-                dehaze_input = image
-                if use_dehazer and dehazer_size:
-                    size = int(dehazer_size)
-                    dehaze_input = F.interpolate(
-                        image, size=(size, size), mode="bilinear", align_corners=False
-                    )
-
-                if use_dehazer:
-                    dehazed = dehazer(dehaze_input)
-                    if dehazer_size:
-                        dehazed = F.interpolate(
-                            dehazed, size=(original_h, original_w), mode="bilinear", align_corners=False
-                        )
-                else:
-                    dehazed = _dehaze_identity(dehaze_input)
-
-                dehazed = dehazed.clamp(0.0, 1.0).squeeze(0).cpu()
+                dehazed = _run_dehaze_step(
+                    image=image,
+                    use_dehazer=use_dehazer,
+                    dehazer=dehazer,
+                    dehazer_size=dehazer_size,
+                )
+                _synchronize_torch_device(device)
                 dehaze_times.append((time.perf_counter() - t0) * 1000.0)
 
+                detector.synchronize()
                 t1 = time.perf_counter()
                 pred = detector.predict([dehazed])[0]
+                detector.synchronize()
                 detect_times.append((time.perf_counter() - t1) * 1000.0)
 
                 samples.append(_to_eval_sample(pred, target, image_counter))
                 image_counter += 1
 
     metrics = evaluate_detection(samples)
+    avg_dehaze_ms = float(sum(dehaze_times) / max(len(dehaze_times), 1))
+    avg_detect_ms = float(sum(detect_times) / max(len(detect_times), 1))
+    avg_pipeline_ms = avg_dehaze_ms + avg_detect_ms
     metrics.update(
         {
             "dehazer_checkpoint": str(dehazer_ckpt),
@@ -206,11 +288,19 @@ def run_od_evaluation(cfg: DictConfig, config_path: Path) -> dict:
             "use_dehazer": use_dehazer,
             "detector_name": str(OmegaConf.select(cfg, "detector.name", default="yolov8")),
             "detector_weights": str(OmegaConf.select(cfg, "detector.weights", default="")),
+            "detector_conf": float(OmegaConf.select(cfg, "detector.conf", default=0.25)),
+            "detector_iou": float(OmegaConf.select(cfg, "detector.iou", default=0.7)),
+            "detector_half": bool(OmegaConf.select(cfg, "detector.half", default=False)),
             "device": str(device),
-            "avg_dehaze_ms": float(sum(dehaze_times) / max(len(dehaze_times), 1)),
-            "avg_detect_ms": float(sum(detect_times) / max(len(detect_times), 1)),
+            "detector_warmup_runs": warmup_runs,
+            "avg_dehaze_ms": avg_dehaze_ms,
+            "avg_detect_ms": avg_detect_ms,
+            "avg_pipeline_ms": avg_pipeline_ms,
+            "pipeline_fps": float(1000.0 / avg_pipeline_ms) if avg_pipeline_ms > 0 else 0.0,
+            "run_dir": str(run_dir),
         }
     )
+    metrics.update(detector.runtime_info())
 
     with open(run_dir / "metrics.json", "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
@@ -227,6 +317,11 @@ def run_od_evaluation(cfg: DictConfig, config_path: Path) -> dict:
     label_debug = {
         "gt_label_histogram": {str(k): int(v) for k, v in sorted(gt_counter.items())},
         "pred_label_histogram": {str(k): int(v) for k, v in sorted(pred_counter.items())},
+        "pred_only_label_histogram": {
+            str(k): int(v)
+            for k, v in sorted(pred_counter.items())
+            if k not in gt_counter
+        },
         "per_class_metrics_iou50": {},
     }
     for class_id, cls_metrics in per_class.items():
@@ -247,7 +342,13 @@ def run_od_evaluation(cfg: DictConfig, config_path: Path) -> dict:
     viz_enabled = bool(OmegaConf.select(cfg, "evaluation_od.visualization.enabled", default=False))
     if viz_enabled:
         viz_num_samples = int(OmegaConf.select(cfg, "evaluation_od.visualization.num_samples", default=12))
-        viz_score_thr = float(OmegaConf.select(cfg, "detector.conf", default=0.25))
+        viz_score_thr = float(
+            OmegaConf.select(
+                cfg,
+                "evaluation_od.visualization.score_thr",
+                default=max(float(OmegaConf.select(cfg, "detector.conf", default=0.25)), 0.25),
+            )
+        )
         viz_seed = int(OmegaConf.select(cfg, "evaluation_od.visualization.seed", default=42))
         viz_dir = run_dir / "visualizations"
         visualize_random_od_predictions(
@@ -263,6 +364,10 @@ def run_od_evaluation(cfg: DictConfig, config_path: Path) -> dict:
     print(f"Recall: {metrics['recall']:.4f}")
     print(f"mAP@0.5: {metrics['map50']:.4f}")
     print(f"mAP@0.5:0.95: {metrics['map50_95']:.4f}")
+    print(f"Detector backend: {metrics.get('detector_backend_actual', metrics.get('detector_backend_declared', 'unknown'))}")
+    print(f"Avg dehaze ms: {metrics['avg_dehaze_ms']:.3f}")
+    print(f"Avg detect ms: {metrics['avg_detect_ms']:.3f}")
+    print(f"Avg pipeline ms: {metrics['avg_pipeline_ms']:.3f}")
     print("Saved class diagnostics to: label_debug.json")
     print(f"Run saved to: {run_dir}")
     return metrics

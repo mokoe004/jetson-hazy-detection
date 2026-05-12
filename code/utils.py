@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 from torchvision import transforms
 
-from models import AODNet, AODnetDepthwiseSpatial, AODnetDepthwiseGaussian, FFANet, LCANet, LDNet, LFDNet, GCANet, TinyDehazeNet
+from models import AODNet, AODnetDepthwiseSpatial, AODnetDepthwiseGaussian, FFANet, LDNet, LFDNet, GCANet, TinyDehazeNet
 
 def print_model_info(model):
     """
@@ -36,14 +36,27 @@ def cfg_select_model(cfg, device: str) -> nn.Module:
     if cfg.model.name == "AODNet":
         model = AODNet().to(torch_device)
     elif cfg.model.name == "AODNetDepthwiseSpatial":
+        base_channels = int(getattr(cfg.model, "base_channels", 3))
         sigma_scale = float(getattr(cfg.model, "sigma_scale", 0.3))
         heatmap_augmentation = bool(getattr(cfg.model, "heatmap_augmentation", True))
         alpha_init = float(getattr(cfg.model, "alpha_init", 0.5))
-        use_spatial_attention = bool(getattr(cfg.model, "use_spatial_attention", True))
+        attention_variant = str(getattr(cfg.model, "attention_variant", "legacy_gaussian"))
+        num_attention_peaks = int(getattr(cfg.model, "num_attention_peaks", 1))
+        use_input_edge = bool(getattr(cfg.model, "use_input_edge", True))
+        use_channel_gate = bool(getattr(cfg.model, "use_channel_gate", False))
+        channel_gate_reduction = int(getattr(cfg.model, "channel_gate_reduction", 8))
+        spatial_hidden_channels = getattr(cfg.model, "spatial_hidden_channels", None)
         model = AODnetDepthwiseSpatial(
+            base_channels=base_channels,
             sigma_scale=sigma_scale,
             heatmap_augmentation=heatmap_augmentation,
             alpha_init=alpha_init,
+            attention_variant=attention_variant,
+            num_attention_peaks=num_attention_peaks,
+            use_input_edge=use_input_edge,
+            use_channel_gate=use_channel_gate,
+            channel_gate_reduction=channel_gate_reduction,
+            spatial_hidden_channels=spatial_hidden_channels,
             use_spatial_attention=use_spatial_attention,
         ).to(torch_device)
     elif cfg.model.name == "AODNetDepthwiseGaussian":
@@ -65,8 +78,6 @@ def cfg_select_model(cfg, device: str) -> nn.Module:
         ).to(torch_device)
     elif cfg.model.name == "FFANet":
         model = FFANet().to(torch_device)
-    elif cfg.model.name == "LCANet":
-        model = LCANet().to(torch_device)
     elif cfg.model.name == "LDNet":
         model = LDNet().to(torch_device)
     elif cfg.model.name == "LFDNet":
@@ -81,6 +92,83 @@ def cfg_select_model(cfg, device: str) -> nn.Module:
         model = AODNet().to(torch_device)
 
     return model
+
+
+def _unwrap_model(model: nn.Module) -> nn.Module:
+    return model.module if isinstance(model, nn.DataParallel) else model
+
+
+def is_gcanet_model(model: nn.Module) -> bool:
+    return _unwrap_model(model).__class__.__name__ == "GCANet"
+
+
+def get_model_input_channels(model: nn.Module) -> int:
+    unwrapped = _unwrap_model(model)
+    conv1 = getattr(unwrapped, "conv1", None)
+    if isinstance(conv1, nn.Conv2d):
+        return int(conv1.in_channels)
+
+    for module in unwrapped.modules():
+        if isinstance(module, nn.Conv2d):
+            return int(module.in_channels)
+
+    raise ValueError(f"Could not infer input channels for model {unwrapped.__class__.__name__}.")
+
+
+def compute_edge_channel(image: torch.Tensor) -> torch.Tensor:
+    """Compute the official GCANet edge map from an RGB tensor in BCHW layout."""
+    if image.dim() != 4:
+        raise ValueError(f"Expected BCHW tensor, got shape {tuple(image.shape)}.")
+    if image.size(1) != 3:
+        raise ValueError(f"Edge computation expects RGB input with 3 channels, got {image.size(1)}.")
+
+    x_diffx = torch.abs(image[:, :, :, 1:] - image[:, :, :, :-1])
+    x_diffy = torch.abs(image[:, :, 1:, :] - image[:, :, :-1, :])
+    edge = image.new_zeros((image.size(0), image.size(1), image.size(2), image.size(3)))
+    edge[:, :, :, 1:] += x_diffx
+    edge[:, :, :, :-1] += x_diffx
+    edge[:, :, 1:, :] += x_diffy
+    edge[:, :, :-1, :] += x_diffy
+    edge = torch.sum(edge, dim=1, keepdim=True) / 3.0
+    edge = edge / 4.0
+    return edge
+
+
+def prepare_model_input(model: nn.Module, image: torch.Tensor) -> torch.Tensor:
+    """Adapt a BCHW tensor to the channel count expected by the dehazing model."""
+    if image.dim() != 4:
+        raise ValueError(f"Expected BCHW tensor, got shape {tuple(image.shape)}.")
+
+    expected_channels = get_model_input_channels(model)
+    actual_channels = int(image.size(1))
+    if expected_channels == actual_channels:
+        return image
+    if expected_channels == 4 and actual_channels == 3:
+        edge = compute_edge_channel(image)
+        return torch.cat((image, edge), dim=1)
+
+    raise ValueError(
+        f"Model expects {expected_channels} input channels, but got tensor with {actual_channels} channels."
+    )
+
+
+def run_dehazer(model: nn.Module, image: torch.Tensor) -> torch.Tensor:
+    """Run a dehazing model on normalized RGB input and return normalized RGB output."""
+    if image.dim() != 4:
+        raise ValueError(f"Expected BCHW tensor, got shape {tuple(image.shape)}.")
+
+    if is_gcanet_model(model):
+        rgb_255 = image * 255.0
+        edge = compute_edge_channel(rgb_255)
+        model_input = torch.cat((rgb_255, edge), dim=1) - 128.0
+        prediction = model(model_input)
+        unwrapped = _unwrap_model(model)
+        if bool(getattr(unwrapped, "only_residual", False)):
+            prediction = prediction + rgb_255
+        return prediction.clamp(0.0, 255.0) / 255.0
+
+    model_input = prepare_model_input(model, image)
+    return model(model_input)
 
 
 def load_pretrained_dehazer(
@@ -232,13 +320,13 @@ def visualize_random_od_predictions(
                 dehaze_input = F.interpolate(image_batched, size=(size, size), mode="bilinear", align_corners=False)
 
             if use_dehazer:
-                dehazed = dehazer(dehaze_input)
+                dehazed = run_dehazer(dehazer, dehaze_input)
                 if dehazer_size:
                     dehazed = F.interpolate(dehazed, size=(original_h, original_w), mode="bilinear", align_corners=False)
             else:
                 dehazed = dehaze_input
 
-            dehazed = dehazed.clamp(0.0, 1.0).squeeze(0).cpu()
+            dehazed = dehazed.clamp(0.0, 1.0).squeeze(0)
             pred = detector.predict([dehazed])[0]
 
             gt_boxes = target["boxes"].detach().cpu().to(torch.float32)

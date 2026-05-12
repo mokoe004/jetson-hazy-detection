@@ -1,6 +1,8 @@
 import time
 import torch
 
+from utils import run_dehazer
+
 def benchmark_single_image(
     model,
     device,
@@ -22,7 +24,7 @@ def benchmark_single_image(
     # -------- Warmup --------
     with torch.no_grad():
         for _ in range(warmup):
-            _ = model(dummy_input)
+            _ = run_dehazer(model, dummy_input)
 
     if device.type == "cuda":
         torch.cuda.synchronize()
@@ -32,7 +34,7 @@ def benchmark_single_image(
 
     with torch.no_grad():
         for _ in range(runs):
-            _ = model(dummy_input)
+            _ = run_dehazer(model, dummy_input)
 
     if device.type == "cuda":
         torch.cuda.synchronize()
@@ -76,7 +78,7 @@ def benchmark_dataloader(
 
             start = time.perf_counter()
 
-            _ = model(hazy)
+            _ = run_dehazer(model, hazy)
 
             if device.type == "cuda":
                 torch.cuda.synchronize()
@@ -114,9 +116,9 @@ def benchmark_gpu(
         with torch.no_grad():
             if use_fp16:
                 with torch.cuda.amp.autocast():
-                    model(dummy)
+                    run_dehazer(model, dummy)
             else:
-                model(dummy)
+                run_dehazer(model, dummy)
 
     torch.cuda.synchronize()
     start = time.time()
@@ -125,9 +127,9 @@ def benchmark_gpu(
         with torch.no_grad():
             if use_fp16:
                 with torch.cuda.amp.autocast():
-                    model(dummy)
+                    run_dehazer(model, dummy)
             else:
-                model(dummy)
+                run_dehazer(model, dummy)
 
     torch.cuda.synchronize()
     end = time.time()

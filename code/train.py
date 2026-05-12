@@ -21,7 +21,7 @@ from evaluation.evaluation import calculate_psnr_ssim
 from evaluation.ssim_psnr_eval import ssim
 from omegaconf import OmegaConf
 
-from utils import print_model_info, cfg_select_model
+from utils import print_model_info, cfg_select_model, run_dehazer
 
 
 def configure_realtime_logging():
@@ -79,7 +79,7 @@ def _measure_dehaze_perf_ms(model, dataloader, device, max_batches: int = 10):
             if device.type == "cuda":
                 torch.cuda.synchronize()
             t0 = time.perf_counter()
-            _ = model(hazy)
+            _ = run_dehazer(model, hazy)
             if device.type == "cuda":
                 torch.cuda.synchronize()
             timings_ms.append((time.perf_counter() - t0) * 1000.0)
@@ -357,7 +357,7 @@ def train(cfg, config_path: Optional[Path] = None):
             clear = clear.to(device, non_blocking=True)
 
             optimizer.zero_grad()
-            prediction = model(hazy)
+            prediction = run_dehazer(model, hazy)
             loss = criterion(prediction, clear)
             loss.backward()
             optimizer.step()
@@ -486,6 +486,20 @@ def train(cfg, config_path: Optional[Path] = None):
     print(f"CSV log:   {csv_path}")
     print(f"Last:      {last_path}")
     print(f"Outputs:   {out_dir}")
+    return {
+        "run_dir": run_dir,
+        "model_dir": model_dir,
+        "output_dir": out_dir,
+        "csv_path": csv_path,
+        "best_model_path": best_path,
+        "best_psnr_model_path": best_psnr_path,
+        "best_map50_model_path": best_map50_path if best_map50 > float("-inf") else None,
+        "last_model_path": last_path,
+        "best_psnr": float(best_psnr),
+        "best_map50": None if best_map50 == float("-inf") else float(best_map50),
+        "best_selection_score": float(best_score),
+        "selection_metric": selection_metric,
+    }
 
 
 def parse_args():

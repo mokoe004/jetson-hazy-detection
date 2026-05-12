@@ -28,7 +28,7 @@ training:
     metric: "selection_score" # options: selection_score | psnr
 
 model:
-  name: "TinyDehazeNet" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
+  name: "TinyDehazeNet" # options: AODNet | FFANet | LDNet | LFDNet | GCANet | TinyDehazeNet
   base_channels: 8 # nur fuer TinyDehazeNet relevant
   save_path: "./runs/tinydehaze" # Run-Ordner fuer Logs/Outputs
 
