@@ -1,11 +1,13 @@
 import argparse
 import csv
+import random
 import os
 from pathlib import Path
 import sys
 import time
 from typing import Optional
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -94,6 +96,41 @@ def _is_gaussian_model_name(model_name: str) -> bool:
     return str(model_name).strip().lower() in {"aodnetdepthwisegaussian"}
 
 
+def _parse_od_eval_every(raw_value) -> Optional[int]:
+    if raw_value is None or raw_value is False:
+        return None
+    if isinstance(raw_value, str) and raw_value.strip().lower() in {"false", "off", "none", "0"}:
+        return None
+
+    interval = int(raw_value)
+    if interval < 1:
+        return None
+    return interval
+
+
+def _seed_everything(seed: int, deterministic: bool):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+
+    if torch.backends.cudnn.is_available():
+        torch.backends.cudnn.deterministic = deterministic
+        torch.backends.cudnn.benchmark = not deterministic
+
+    torch.use_deterministic_algorithms(deterministic, warn_only=True)
+
+
+def _seed_worker(worker_id: int):
+    del worker_id
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+    torch.manual_seed(worker_seed)
+
+
 class WeightedDehazeLoss(nn.Module):
     def __init__(self, mse_weight=0.0, l1_weight=1.0, ssim_weight=0.1):
         super().__init__()
@@ -130,6 +167,10 @@ def _select_training_dataset(cfg, transform):
 
 
 def train(cfg, config_path: Optional[Path] = None):
+    seed = int(OmegaConf.select(cfg, "training.seed", default=42))
+    deterministic = bool(OmegaConf.select(cfg, "training.deterministic", default=True))
+    _seed_everything(seed, deterministic)
+
     # --------------------------------------------------
     # 1) Device + Run Directories
     # --------------------------------------------------
@@ -163,14 +204,6 @@ def train(cfg, config_path: Optional[Path] = None):
     # --------------------------------------------------
     model = cfg_select_model(cfg, cfg.training.device if torch.cuda.is_available() else "cpu")
     print_model_info(model)
-
-    def weights_init(m):
-        if isinstance(m, nn.Conv2d):
-            nn.init.normal_(m.weight, 0.0, 0.02)
-            if m.bias is not None:
-                nn.init.zeros_(m.bias)
-
-    model.apply(weights_init)
 
     criterion = WeightedDehazeLoss(
         mse_weight=float(OmegaConf.select(cfg, "training.loss.mse_weight", default=0.0)),
@@ -210,8 +243,11 @@ def train(cfg, config_path: Optional[Path] = None):
     # Train val split 0.8 - 0.2
     val_size = int(0.2 * len(dataset))
     train_size = len(dataset) - val_size
-    torch.manual_seed(42)
-    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    split_generator = torch.Generator().manual_seed(seed)
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size], generator=split_generator)
+
+    train_generator = torch.Generator().manual_seed(seed)
+    val_generator = torch.Generator().manual_seed(seed + 1)
 
     train_loader = DataLoader(
         train_dataset,
@@ -219,6 +255,8 @@ def train(cfg, config_path: Optional[Path] = None):
         shuffle=True,
         num_workers=cfg.training.num_workers,
         pin_memory=True,
+        worker_init_fn=_seed_worker,
+        generator=train_generator,
     )
 
     val_loader = DataLoader(
@@ -227,9 +265,14 @@ def train(cfg, config_path: Optional[Path] = None):
         shuffle=False,
         num_workers=cfg.training.num_workers,
         pin_memory=True,
+        worker_init_fn=_seed_worker,
+        generator=val_generator,
     )
 
-    print(f"Train: {len(train_dataset)} | Val: {len(val_dataset)}\n", flush=True)
+    print(
+        f"Train: {len(train_dataset)} | Val: {len(val_dataset)} | Seed: {seed} | Deterministic: {deterministic}\n",
+        flush=True,
+    )
 
     # --------------------------------------------------
     # 5) CSV Logger init
@@ -258,8 +301,8 @@ def train(cfg, config_path: Optional[Path] = None):
     # 6) Training Loop (best + last)
     # --------------------------------------------------
     selection_metric = str(OmegaConf.select(cfg, "training.selection_metric", default="psnr")).lower()
-    od_eval_enabled = _has_detector_cfg(cfg)
-    od_eval_every = int(OmegaConf.select(cfg, "training.od_eval_every", default=5))
+    od_eval_every = _parse_od_eval_every(OmegaConf.select(cfg, "training.od_eval_every", default=5))
+    od_eval_enabled = _has_detector_cfg(cfg) and od_eval_every is not None
     alpha_latency = float(OmegaConf.select(cfg, "training.alpha_latency", default=0.001))
     perf_batches = int(OmegaConf.select(cfg, "training.perf_batches", default=10))
     early_stopping_enabled = bool(OmegaConf.select(cfg, "training.early_stopping.enabled", default=False))
@@ -273,7 +316,10 @@ def train(cfg, config_path: Optional[Path] = None):
         raise ValueError("training.selection_metric must be one of: psnr, map50, hybrid")
 
     if not od_eval_enabled and selection_metric in {"map50", "hybrid"}:
-        raise ValueError("selection_metric uses OD metrics, but no detector config is provided.")
+        raise ValueError(
+            "selection_metric uses OD metrics, but OD evaluation is disabled. "
+            "Set training.od_eval_every to a positive integer or use selection_metric='psnr'."
+        )
 
     if early_stopping_patience < 1:
         raise ValueError("training.early_stopping.patience must be >= 1")
@@ -314,8 +360,6 @@ def train(cfg, config_path: Optional[Path] = None):
             prediction = model(hazy)
             loss = criterion(prediction, clear)
             loss.backward()
-
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
             optimizer.step()
 
             train_loss += loss.item()

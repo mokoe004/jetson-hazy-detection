@@ -6,6 +6,16 @@ from PIL import Image
 import numpy as np
 
 
+def _apply_paired_transforms(transforms, hazy_img, clear_img):
+    seed = int(np.random.randint(2147483647))
+    with torch.random.fork_rng(devices=[]):
+        torch.manual_seed(seed)
+        hazy_img = transforms(hazy_img)
+        torch.manual_seed(seed)
+        clear_img = transforms(clear_img)
+    return hazy_img, clear_img
+
+
 class RTTSDataset(Dataset):
     def __init__(self, cfg, image_set='test', transforms=None):
         """
@@ -121,11 +131,7 @@ class PairedDataset(Dataset):
         clear_img = Image.open(clear_path).convert("RGB")
 
         if self.transforms:
-            seed = np.random.randint(2147483647)
-            torch.manual_seed(seed)
-            hazy_img = self.transforms(hazy_img)
-            torch.manual_seed(seed)
-            clear_img = self.transforms(clear_img)
+            hazy_img, clear_img = _apply_paired_transforms(self.transforms, hazy_img, clear_img)
 
         return hazy_img, clear_img
 
@@ -169,10 +175,6 @@ class ResideOTS(Dataset):
         clear_img = Image.open(clear_path).convert("RGB")
 
         if self.transforms:
-            seed = np.random.randint(2147483647)
-            torch.manual_seed(seed)
-            hazy_img = self.transforms(hazy_img)
-            torch.manual_seed(seed)
-            clear_img = self.transforms(clear_img)
+            hazy_img, clear_img = _apply_paired_transforms(self.transforms, hazy_img, clear_img)
 
         return hazy_img, clear_img

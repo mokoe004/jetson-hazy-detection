@@ -6,26 +6,26 @@ dataset:
   clear_path: "clear" # nur fuer Reside_OTS
   img_size: 256 # Resize auf (img_size, img_size)
   return_bboxes: false # fuer Dehazing-Training i.d.R. false
-  subset: 500 # int fuer Teilmenge, oder false fuer kompletten Datensatz
+  subset: false # int fuer Teilmenge, oder false fuer kompletten Datensatz
 
 training:
   device: "cuda" # cuda | cpu
-  batch_size: 2
+  batch_size: 3
   lr: 0.0001
   weight_decay: 0.0
   epochs: 20
-  num_workers: 0
+  num_workers: 2
   checkpoint_root: "./checkpoints" # Ordner fuer best/last/epoch_XXX Checkpoints
   selection_metric: "psnr" # options: psnr | map50 | hybrid
-  od_eval_every: 5 # nur relevant fuer map50/hybrid
+  od_eval_every: false # nur relevant fuer map50/hybrid
   od_eval_subset: 300 # RTTS-Subset fuer OD-Eval waehrend Training
   alpha_latency: 0.001 # nur fuer hybrid: score = map50 - alpha * avg_dehaze_ms
   perf_batches: 10 # Anzahl Batches fuer Dehaze-Latenzmessung pro Epoche
   early_stopping:
-    enabled: false
+    enabled: true
     patience: 5
     min_delta: 0.0
-    metric: "selection_score" # options: selection_score | psnr
+    metric: "psnr" # options: selection_score | psnr
 
 model:
   name: "LFDNet" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
@@ -36,7 +36,7 @@ detector:
   weights: "./pretrained_models/YOLO/yolov8n.pt"
   device: "cuda:0" # cuda:0 | cpu
   conf: 0.25
-  iou: 0.7
+  iou: 0.5
   imgsz: 640
   max_det: 300
 

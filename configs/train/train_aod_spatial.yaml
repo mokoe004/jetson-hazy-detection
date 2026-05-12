@@ -1,39 +1,42 @@
 # train_tinydehaze.yaml
 dataset:
-  #name: "Reside_OTS" # options: Reside_OTS | Paired (alias: PairedDataset)
-  #root: "./datasets/RESIDE-OTS" # Root des Datensatzes
-  name: "RTTS"
-  root: "./datasets/RTTS/RTTS"
+  name: "Reside_OTS" # options: Reside_OTS | Paired (alias: PairedDataset)
+  root: "./datasets/RESIDE-OTS" # Root des Datensatzes
+  #name: "RTTS"
+  #root: "./datasets/RTTS/RTTS"
   hazy_path: "hazy-part2" # nur fuer Reside_OTS
   clear_path: "clear" # nur fuer Reside_OTS
   img_size: 256 # Resize auf (img_size, img_size)
   return_bboxes: true # fuer Dehazing-Training i.d.R. false
-  subset: false # int fuer Teilmenge, oder false fuer kompletten Datensatz
+  subset: 500 # int fuer Teilmenge, oder false fuer kompletten Datensatz
 
 training:
   device: "cuda" # cuda | cpu
-  batch_size: 4
+  seed: 42
+  deterministic: true
+  batch_size: 3
   lr: 0.0002
   weight_decay: 0.0
-  epochs: 30
-  num_workers: 0
+  epochs: 50
+  num_workers: 2
   checkpoint_root: "./checkpoints" # Ordner fuer best/last/epoch_XXX Checkpoints
-  selection_metric: "hybrid" # options: psnr | map50 | hybrid (speichert zusaetzlich best_psnr/best_map50)
-  od_eval_every: 5 # nur relevant fuer map50/hybrid
+  selection_metric: "psnr" # options: psnr | map50 | hybrid (speichert zusaetzlich best_psnr/best_map50)
+  od_eval_every: false # positive int fuer Intervall, false deaktiviert OD-Eval; fuer map50/hybrid muss es aktiv sein
   od_eval_subset: 100 # RTTS-Subset fuer OD-Eval waehrend Training
   alpha_latency: 0.001 # nur fuer hybrid: score = map50 - alpha * avg_dehaze_ms
   perf_batches: 10 # Anzahl Batches fuer Dehaze-Latenzmessung pro Epoche
   early_stopping:
     enabled: false
-    patience: 5
+    patience: 15
     min_delta: 0.0
-    metric: "selection_score" # options: selection_score | psnr
+    metric: "psnr" # options: selection_score | psnr
 
 model:
   name: "AODNetDepthwiseSpatial" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
   sigma_scale: 0.3
-  heatmap_augmentation: true
+  heatmap_augmentation: false
   alpha_init: 0.5
+  use_spatial_attention: false
   base_channels: 8 # nur fuer TinyDehazeNet relevant
   save_path: "./runs/AODNetDepthwiseSpatial" # Run-Ordner fuer Logs/Outputs
 
@@ -42,7 +45,7 @@ detector:
   weights: "./pretrained_models/YOLO/yolov8n.pt"
   device: "cuda:0" # cuda:0 | cpu
   conf: 0.25
-  iou: 0.7
+  iou: 0.5
   imgsz: 512
   max_det: 300
 
@@ -54,4 +57,4 @@ evaluation_od:
   num_workers: 0
   pin_memory: true
   dehazer_input_size: 256 # false oder int (z.B. 224/256/512)
-  dehazer_checkpoint_path: "runs/AODNetDepthwiseGaussian/run_2026_03_11_22_33_07/models/best_map50_model.pth"
+  # dehazer_checkpoint_path: "runs/AODNetDepthwiseGaussian/run_2026_03_11_22_33_07/models/best_map50_model.pth"

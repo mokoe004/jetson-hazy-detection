@@ -3,7 +3,7 @@ dataset:
   root: "./datasets/RTTS/RTTS"
   img_size: 256
   return_bboxes: true
-  subset: false
+  subset: 100
 
 model:
   name: "AODNetDepthwiseSpatial" # options: AODNet | FFANet | LCANet | LDNet | LFDNet | GCANet | TinyDehazeNet
@@ -13,7 +13,7 @@ evaluation_od:
   device: "cuda"
   use_dehazer: False
   #dehazer_checkpoint_path: "./pretrained_models/AOD-Net/epoch3_full_OTS_subset.pth"
-  dehazer_checkpoint_path: "runs/AODNetDepthwiseSpatial/run_2026_03_08_23_50_46/models/best_map50_model.pth"
+  dehazer_checkpoint_path: "runs/AODNetDepthwiseSpatial/run_2026_03_12_03_04_16/models/last_model.pth"
   save_path: "./runs/od_eval/AODNet_yolov8"
   image_set: "test" # RTTS split file under ImageSets/Main/test.txt
   batch_size: 1

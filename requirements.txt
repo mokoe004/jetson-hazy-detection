@@ -1,7 +1,7 @@
 torch
 torchvision
-roboflow
+#roboflow
 tqdm
 omegaconf
-opencv-python
+#opencv-python
 ultralytics

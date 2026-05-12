@@ -4,8 +4,21 @@ from typing import List
 
 import numpy as np
 import torch
+import cv2
 
 from detectors.base import DetectionBatch, DetectorAdapter
+
+
+def _patch_headless_cv2():
+    def _not_available(*args, **kwargs):
+        raise RuntimeError("OpenCV GUI functions are unavailable in this headless environment.")
+
+    for attr in ("imshow", "namedWindow", "destroyWindow", "destroyAllWindows"):
+        if not hasattr(cv2, attr):
+            setattr(cv2, attr, _not_available)
+
+    if not hasattr(cv2, "waitKey"):
+        setattr(cv2, "waitKey", lambda *args, **kwargs: -1)
 
 
 class YOLOv8Adapter(DetectorAdapter):
@@ -19,6 +32,7 @@ class YOLOv8Adapter(DetectorAdapter):
         max_det: int = 300,
     ):
         try:
+            _patch_headless_cv2()
             from ultralytics import YOLO
         except ImportError as exc:
             raise ImportError(
@@ -74,4 +88,3 @@ class YOLOv8Adapter(DetectorAdapter):
                 )
             )
         return batches
-

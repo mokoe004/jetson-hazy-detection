@@ -159,12 +159,13 @@ class AODnetDepthwiseSpatial(nn.Module):
     The Gaussian attention is applied on the multi-scale concatenated feature map before e_conv5.
     """
 
-    def __init__(self, sigma_scale=0.3, heatmap_augmentation=True, alpha_init=0.5):
+    def __init__(self, sigma_scale=0.3, heatmap_augmentation=True, alpha_init=0.5, use_spatial_attention=True):
         super().__init__()
 
         self.relu = nn.ReLU(inplace=True)
         self.sigma_scale = float(sigma_scale)
         self.heatmap_augmentation = bool(heatmap_augmentation)
+        self.use_spatial_attention = bool(use_spatial_attention)
         self.e_conv1 = nn.Conv2d(in_channels=3, out_channels=3, kernel_size=1, stride=1, padding=0, bias=True)
         self.e_conv2 = DepthwiseSeparableConv2d(
             in_channels=3, out_channels=3, kernel_size=3, stride=1, padding=1, bias=True
@@ -216,8 +217,9 @@ class AODnetDepthwiseSpatial(nn.Module):
         x4 = self.relu(self.e_conv4(concat2))
 
         concat3 = torch.cat([x1, x2, x3, x4], 1)
-        batch_heatmap = self._build_feature_guided_heatmap(concat3)
-        concat3 = self.gaussian_attention(concat3, batch_heatmap)
+        if self.use_spatial_attention:
+            batch_heatmap = self._build_feature_guided_heatmap(concat3)
+            concat3 = self.gaussian_attention(concat3, batch_heatmap)
         x5 = self.relu(self.e_conv5(concat3))
 
         clean_image = self.relu((x5 * x) - x5 + 1)

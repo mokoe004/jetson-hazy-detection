@@ -39,10 +39,12 @@ def cfg_select_model(cfg, device: str) -> nn.Module:
         sigma_scale = float(getattr(cfg.model, "sigma_scale", 0.3))
         heatmap_augmentation = bool(getattr(cfg.model, "heatmap_augmentation", True))
         alpha_init = float(getattr(cfg.model, "alpha_init", 0.5))
+        use_spatial_attention = bool(getattr(cfg.model, "use_spatial_attention", True))
         model = AODnetDepthwiseSpatial(
             sigma_scale=sigma_scale,
             heatmap_augmentation=heatmap_augmentation,
             alpha_init=alpha_init,
+            use_spatial_attention=use_spatial_attention,
         ).to(torch_device)
     elif cfg.model.name == "AODNetDepthwiseGaussian":
         base_channels = int(getattr(cfg.model, "base_channels", 3))
