@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import csv
 import json
@@ -124,8 +126,31 @@ def _remap_rtts_gt_labels_to_coco(gt_labels: torch.Tensor) -> torch.Tensor:
     return out
 
 
-def _to_eval_sample(pred, target, image_id: int) -> EvalSample:
+def _scale_boxes_to_eval_shape(
+    boxes: torch.Tensor,
+    original_shape: tuple[int, int],
+    eval_shape: tuple[int, int],
+) -> torch.Tensor:
+    original_h, original_w = original_shape
+    eval_h, eval_w = eval_shape
+    if (original_h, original_w) == (eval_h, eval_w):
+        return boxes
+
+    scaled = boxes.clone()
+    scaled[:, [0, 2]] *= float(eval_w) / float(original_w)
+    scaled[:, [1, 3]] *= float(eval_h) / float(original_h)
+    return scaled
+
+
+def _to_eval_sample(
+    pred,
+    target,
+    image_id: int,
+    original_shape: tuple[int, int],
+    eval_shape: tuple[int, int],
+) -> EvalSample:
     gt_boxes = target["boxes"].detach().cpu().to(torch.float32)
+    gt_boxes = _scale_boxes_to_eval_shape(gt_boxes, original_shape, eval_shape)
     gt_labels = target["labels"].detach().cpu().to(torch.int64)
     gt_labels = _remap_rtts_gt_labels_to_coco(gt_labels)
     return EvalSample(
@@ -143,6 +168,7 @@ def _run_dehaze_step(
     use_dehazer: bool,
     dehazer,
     dehazer_size,
+    restore_original_size: bool = True,
 ) -> torch.Tensor:
     original_h, original_w = image.shape[-2:]
     dehaze_input = image
@@ -157,7 +183,7 @@ def _run_dehaze_step(
 
     if use_dehazer:
         dehazed = run_dehazer(dehazer, dehaze_input)
-        if dehazer_size:
+        if dehazer_size and restore_original_size:
             dehazed = F.interpolate(
                 dehazed,
                 size=(original_h, original_w),
@@ -178,6 +204,7 @@ def _warmup_pipeline(
     dehazer,
     detector,
     dehazer_size,
+    restore_original_size: bool,
 ) -> int:
     warmup_runs = int(OmegaConf.select(cfg, "evaluation_od.warmup_runs", default=3))
     if warmup_runs <= 0 or len(loader.dataset) == 0:
@@ -187,7 +214,7 @@ def _warmup_pipeline(
     warmup_image = warmup_sample[0] if isinstance(warmup_sample, (tuple, list)) else warmup_sample
     warmup_image = warmup_image.to(device).unsqueeze(0)
 
-    with torch.no_grad():
+    with torch.inference_mode():
         for _ in range(warmup_runs):
             _synchronize_torch_device(device)
             dehazed = _run_dehaze_step(
@@ -195,11 +222,13 @@ def _warmup_pipeline(
                 use_dehazer=use_dehazer,
                 dehazer=dehazer,
                 dehazer_size=dehazer_size,
+                restore_original_size=restore_original_size,
             )
             _synchronize_torch_device(device)
             detector.synchronize()
             detector.predict([dehazed])
             detector.synchronize()
+            del dehazed
 
     return warmup_runs
 
@@ -242,6 +271,9 @@ def run_od_evaluation(cfg: DictConfig, config_path: Path) -> dict:
     dehaze_times = []
     detect_times = []
     dehazer_size = OmegaConf.select(cfg, "evaluation_od.dehazer_input_size", default=False)
+    restore_original_size = bool(
+        OmegaConf.select(cfg, "evaluation_od.restore_original_size", default=True)
+    )
     warmup_runs = _warmup_pipeline(
         cfg=cfg,
         loader=loader,
@@ -250,12 +282,14 @@ def run_od_evaluation(cfg: DictConfig, config_path: Path) -> dict:
         dehazer=dehazer,
         detector=detector,
         dehazer_size=dehazer_size,
+        restore_original_size=restore_original_size,
     )
 
-    with torch.no_grad():
+    with torch.inference_mode():
         image_counter = 0
         for images, targets in tqdm(loader, desc="OD Eval"):
             for image, target in zip(images, targets):
+                original_shape = tuple(int(v) for v in image.shape[-2:])
                 image = image.to(device, non_blocking=True).unsqueeze(0)
                 _synchronize_torch_device(device)
                 t0 = time.perf_counter()
@@ -264,7 +298,9 @@ def run_od_evaluation(cfg: DictConfig, config_path: Path) -> dict:
                     use_dehazer=use_dehazer,
                     dehazer=dehazer,
                     dehazer_size=dehazer_size,
+                    restore_original_size=restore_original_size,
                 )
+                eval_shape = tuple(int(v) for v in dehazed.shape[-2:])
                 _synchronize_torch_device(device)
                 dehaze_times.append((time.perf_counter() - t0) * 1000.0)
 
@@ -274,8 +310,9 @@ def run_od_evaluation(cfg: DictConfig, config_path: Path) -> dict:
                 detector.synchronize()
                 detect_times.append((time.perf_counter() - t1) * 1000.0)
 
-                samples.append(_to_eval_sample(pred, target, image_counter))
+                samples.append(_to_eval_sample(pred, target, image_counter, original_shape, eval_shape))
                 image_counter += 1
+                del image, dehazed
 
     metrics = evaluate_detection(samples)
     avg_dehaze_ms = float(sum(dehaze_times) / max(len(dehaze_times), 1))
@@ -286,6 +323,7 @@ def run_od_evaluation(cfg: DictConfig, config_path: Path) -> dict:
             "dehazer_checkpoint": str(dehazer_ckpt),
             "dehazer_model": str(cfg.model.name) if use_dehazer else "none",
             "use_dehazer": use_dehazer,
+            "restore_original_size": restore_original_size,
             "detector_name": str(OmegaConf.select(cfg, "detector.name", default="yolov8")),
             "detector_weights": str(OmegaConf.select(cfg, "detector.weights", default="")),
             "detector_conf": float(OmegaConf.select(cfg, "detector.conf", default=0.25)),

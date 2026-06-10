@@ -249,6 +249,17 @@ def visualize_random_od_predictions(
             return str(names_map.get(cls_id, f"class_{cls_id}"))
         return f"class_{cls_id}"
 
+    def _scale_boxes(boxes: torch.Tensor, original_shape, eval_shape) -> torch.Tensor:
+        original_h, original_w = original_shape
+        eval_h, eval_w = eval_shape
+        if (original_h, original_w) == (eval_h, eval_w):
+            return boxes
+
+        scaled = boxes.clone()
+        scaled[:, [0, 2]] *= float(eval_w) / float(original_w)
+        scaled[:, [1, 3]] *= float(eval_h) / float(original_h)
+        return scaled
+
     def _draw_box(img, box, color, text):
         x1, y1, x2, y2 = [int(v) for v in box]
         cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
@@ -305,10 +316,11 @@ def visualize_random_od_predictions(
         )
 
     dehazer_size = getattr(getattr(cfg, "evaluation_od", {}), "dehazer_input_size", False)
+    restore_original_size = bool(getattr(getattr(cfg, "evaluation_od", {}), "restore_original_size", True))
     names_map = getattr(detector.model, "names", {})
 
     meta = []
-    with torch.no_grad():
+    with torch.inference_mode():
         for rank, idx in enumerate(chosen_indices):
             image, target = dataset[idx]
             image_batched = image.to(dehaze_device).unsqueeze(0)
@@ -321,15 +333,17 @@ def visualize_random_od_predictions(
 
             if use_dehazer:
                 dehazed = run_dehazer(dehazer, dehaze_input)
-                if dehazer_size:
+                if dehazer_size and restore_original_size:
                     dehazed = F.interpolate(dehazed, size=(original_h, original_w), mode="bilinear", align_corners=False)
             else:
                 dehazed = dehaze_input
 
             dehazed = dehazed.clamp(0.0, 1.0).squeeze(0)
+            eval_shape = tuple(int(v) for v in dehazed.shape[-2:])
             pred = detector.predict([dehazed])[0]
 
             gt_boxes = target["boxes"].detach().cpu().to(torch.float32)
+            gt_boxes = _scale_boxes(gt_boxes, (original_h, original_w), eval_shape)
             gt_labels = _remap_rtts_gt_labels_to_coco(target["labels"].detach().cpu().to(torch.int64))
 
             canvas = _to_bgr_uint8(dehazed)

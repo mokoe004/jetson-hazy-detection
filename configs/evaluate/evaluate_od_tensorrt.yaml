@@ -1,37 +1,38 @@
 dataset:
   name: "RTTS"
-  root: "./datasets/RTTS/RTTS"
+  root: "./datasets/RTTS"
   img_size: 256
   return_bboxes: true
-  subset: false
+  subset: 100
 
 model:
-  name: "LFDNet"
+  name: "AODNet"
   base_channels: 8
 
 evaluation_od:
   device: "cuda"
   use_dehazer: true
-  dehazer_checkpoint_path: "pretrained_models\\LFD-Net\\epoch_30_full_ots"
-  save_path: "./runs/od_eval/LFDNet_yolov8_tensorrt"
+  dehazer_checkpoint_path: "pretrained_models/AOD-Net/best_model.pth"
+  save_path: "./runs/od_eval/AODNet_yolov8_tensorrt_int8"
   image_set: "test"
-  batch_size: 2
-  num_workers: 2
-  pin_memory: true
-  warmup_runs: 3
+  batch_size: 1
+  num_workers: 0
+  pin_memory: false
+  warmup_runs: 1
   dehazer_input_size: 256
+  restore_original_size: false # avoid full-resolution CUDA tensors on Jetson/TensorRT runs
   visualization:
-    enabled: true
+    enabled: false
     num_samples: 12
     seed: 42
     score_thr: 0.5
 
 detector:
   name: "yolov8"
-  weights: "./pretrained_models/YOLO/yolov8n.engine" # exported TensorRT engine
+  weights: "./pretrained_models/YOLO/yolov8n_256_int8.engine" # exported TensorRT engine
   device: "cuda:0"
   conf: 0.001
   iou: 0.5
-  imgsz: 512 # should match the export size for a static engine
+  imgsz: 256 # should match the export size for a static engine
   max_det: 300
   half: false # runtime info is inferred from the engine; this flag mainly affects .pt inference

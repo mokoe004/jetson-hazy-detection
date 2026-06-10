@@ -6,6 +6,7 @@ from typing import List
 import numpy as np
 import torch
 import torch.nn.functional as F
+import cv2
 
 from detectors.base import DetectionBatch, DetectorAdapter
 

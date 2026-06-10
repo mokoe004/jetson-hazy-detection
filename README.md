@@ -162,22 +162,6 @@ Then point `detector.weights` in your eval config to the exported `.engine` file
 Example TensorRT config:
 - `configs/evaluate/evaluate_od_tensorrt.yaml`
 
-### Compare PyTorch CUDA vs TensorRT
-
-Run the same OD pipeline twice and save a comparison summary:
-
-```bash
-python code/compare_od_configs.py \
-  --baseline-config configs/evaluate/evaluate_od.yaml \
-  --candidate-config configs/evaluate/evaluate_od_tensorrt.yaml
-```
-
-This writes a summary under `runs/od_compare/...` including:
-- detector latency improvement
-- detector speedup factor
-- end-to-end pipeline speedup
-- `mAP` / precision / recall deltas
-
 ## Notes
 
 - Use exact model names from `code/utils.py` in configs: `AODNet`, `AODNetDepthwiseSpatial`, `AODNetDepthwiseGaussian`, `FFANet`, `LDNet`, `LFDNet`, `GCANet`, `TinyDehazeNet`.
